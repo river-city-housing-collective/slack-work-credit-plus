@@ -5,7 +5,8 @@ function signInWithSlack($client_id, $client_secret) {
     if (isset($_COOKIE['token'])) {
         $token = $_COOKIE['token'];
     }
-    else if ($_GET['code']) {
+    // new login
+    else if (isset($_GET['code'])) {
         $auth = json_decode(file_get_contents(
             'https://slack.com/api/oauth.access?' .
             'client_id=' . $client_id .
@@ -14,15 +15,15 @@ function signInWithSlack($client_id, $client_secret) {
         ), true);
 
         $token = $auth['access_token'];
-        setcookie('token', $token, strtotime( '+30 days' ));
+        setcookie('token', $token, strtotime( '+30 days' ), '/');
     }
-    // new login
+    // no access
     else {
         return false;
     }
 
     return new Slack($token);
-}  
+}
 
 class Slack {
     public $token;
@@ -36,6 +37,14 @@ class Slack {
 
         $this->userInfo = $identityCheck['user'];
         $this->authed = $identityCheck['ok'];
+
+        if ($this->authed) {
+            // authorized user - replace their token with elevated one
+            $this->token = $WEB_TOKEN;
+
+            $this->userLookup = json_decode($this->apiCall('users.list'), true);
+
+        }
     }
 
     public function apiCall($method, $params = array()) {

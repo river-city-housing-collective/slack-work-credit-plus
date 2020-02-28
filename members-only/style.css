@@ -1,0 +1,20 @@
+#loggedInDisplay {
+    width: auto;
+    position:absolute;
+    top:5%;
+    right:5%;
+    display:inline-flex;
+}
+
+#logoutButtonDiv {
+    text-align: end;
+}
+
+#userInfoDiv {
+    display: inline-block;
+}
+
+ul {
+    list-style: none;
+    padding-left: 0;
+}
