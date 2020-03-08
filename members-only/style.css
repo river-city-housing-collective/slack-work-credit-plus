@@ -1,9 +1,14 @@
 #loggedInDisplay {
-    width: auto;
     position:absolute;
-    top:5%;
-    right:5%;
+    top: 1vw;
+    right: 1vw;
     display:inline-flex;
+}
+
+#avatar {
+    float: left;
+    right: 1vw;
+    position: inherit;
 }
 
 #logoutButtonDiv {

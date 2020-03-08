@@ -5,11 +5,11 @@ ini_set('display_errors', 'on');
 
 header('Content-Type: application/json');
 
-require_once('../db_connect.php');
-require_once('utilities.php');
+require_once('../functions.php');
+require_once('../secrets.php');
 
-$slack = new Slack($config['SL_BOT_TOKEN']);
-$db = new Database();
+$slack = new Slack($BOT_TOKEN);
+$db = new Database($DB_SERVERNAME, $DB_USERNAME, $DB_PASSWORD, $DB_DATABASE);
 
 // get incoming object to work with
 if (isset($_POST['payload'])) {

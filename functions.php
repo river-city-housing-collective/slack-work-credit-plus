@@ -1,6 +1,6 @@
 <?php
 
-function signInWithSlack($client_id, $client_secret) {
+function signInWithSlack($client_id, $client_secret, $web_token, $password) {
     // previous login
     if (isset($_COOKIE['token'])) {
         $token = $_COOKIE['token'];
@@ -22,7 +22,7 @@ function signInWithSlack($client_id, $client_secret) {
         return false;
     }
 
-    return new Slack($token);
+    return new Slack($token, $web_token, $password);
 }
 
 class Slack {
@@ -30,7 +30,7 @@ class Slack {
     public $userInfo;
     public $authed;
 
-    public function __construct($token) {
+    public function __construct($token, $web_token, $password) {
         $this->token = $token;
 
         $identityCheck = json_decode($this->apiCall('users.identity'), true);
@@ -39,11 +39,35 @@ class Slack {
         $this->authed = $identityCheck['ok'];
 
         if ($this->authed) {
+            $this->db = new Database($password);
+
             // authorized user - replace their token with elevated one
-            $this->token = $WEB_TOKEN;
+            $this->token = $web_token;
 
-            $this->userLookup = json_decode($this->apiCall('users.list'), true);
+            // get list of all users for reference?
+            // $this->userLookup = json_decode($this->apiCall('users.list'), true);
 
+            $this->userGroups = json_decode($this->apiCall('usergroups.list'), true);
+
+            // save user id for future calls
+            $this->userId = $this->userInfo['id'];
+
+            // get specifics about logged in user
+            $slackUserInfo = json_decode($this->apiCall('users.profile.get',
+                array('user' => $this->userId)
+            ), true)['profile'];
+
+            $houseDetails = $this->db->query("
+                select h.name, u.boarder from sl_users as u left join sl_houses as h on u.house_id = h.id where u.slack_user_id = '$this->userId'
+            ");
+
+            // pare down to the essentials
+            $this->userInfo = array(
+                'display_name' => $slackUserInfo['display_name'],
+                'avatar' => $slackUserInfo['image_72'],
+                'house' => $houseDetails['name'],
+                'boarder' => $houseDetails['boarder']
+            );
         }
     }
 
@@ -76,9 +100,13 @@ class Slack {
 class Database {
     public $conn;
 
-    public function __construct($servername, $username, $password, $database) {
+    public function __construct($password) {
+        $DB_SERVERNAME = "mysql.rchc.coop";
+        $DB_USERNAME = "rchccoop1";
+        $DB_DATABASE = "rchc_coop_1";
+
         // Create connection
-        $this->conn = new mysqli($servername, $username, $password, $database);
+        $this->conn = new mysqli($DB_SERVERNAME, $DB_USERNAME, $password, $DB_DATABASE);
 
         // Check connection
         if ($this->conn->connect_error) {
@@ -86,19 +114,17 @@ class Database {
         }
 
         // get slack config
-        $sql = 'select * from sl_config';
-        $result = $conn->query($sql);
-        while ($row = $result->fetch_assoc()) {
-            $config[$row['sl_key']] = $row['sl_value'];
-        }
+        // $sql = 'select * from sl_config';
+        // $result = $conn->query($sql);
+        // while ($row = $result->fetch_assoc()) {
+        //     $config[$row['sl_key']] = $row['sl_value'];
+        // }
     }
-    public function userLookup($id) {
-        $sql = "select * from sl_users where user_id = '$id'";
+    public function query($sql) {
         $result = $this->conn->query($sql);
-    
-        // user exists - return info
+
         if ($result->num_rows > 0) {
-            return json_encode($result->fetch_assoc());
+            return $result->fetch_assoc();
         }
         else {
             return false;
