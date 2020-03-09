@@ -1,7 +1,5 @@
 <?php
-// require_once('../secrets.php');
-// require_once('../functions.php');
-require_once('/home/isaneu/rchc.coop/secrets.php');
+require_once('/home/isaneu/rchc.coop/dbconnect.php');
 require_once('/home/isaneu/rchc.coop/functions.php');
 
 if (isset($_GET['logout'])) {
@@ -12,7 +10,8 @@ if (isset($_GET['logout'])) {
     exit();
 }
 
-$slack = signInWithSlack($SLACK_CLIENT_ID, $SLACK_CLIENT_SECRET, $WEB_TOKEN, $DB_PASSWORD);
+// create new slack object (if authenticated)
+$slack = signInWithSlack($conn);
 
 if (!$slack->authed) {
     // show "sign in with slack" button

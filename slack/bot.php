@@ -5,11 +5,11 @@ ini_set('display_errors', 'on');
 
 header('Content-Type: application/json');
 
+require_once('../dbconnect.php');
 require_once('../functions.php');
-require_once('../secrets.php');
 
-$slack = new Slack($BOT_TOKEN);
-$db = new Database($DB_SERVERNAME, $DB_USERNAME, $DB_PASSWORD, $DB_DATABASE);
+// create new slack object
+$slack = new Slack($conn);
 
 // get incoming object to work with
 if (isset($_POST['payload'])) {
@@ -57,14 +57,33 @@ else if ($eventPayload['type'] == 'block_actions') {
     ));
 
     //update usergroup
-    // echo $slack->apiCall(
-    //     $BOT_TOKEN,
-    //      'usergroups.users.update',
-    //      array(
-    //          'usergroup' => $eventPayload['actions'][0]['selected_option']['value'],
-    //          'users' => $eventPayload['user']['id']
-    //      )
-    //  );
+    echo $slack->apiCall(
+        $WRITE_TOKEN,
+        'usergroups.users.update',
+        array(
+            'usergroup' => $eventPayload['actions'][0]['selected_option']['value'],
+            'users' => $eventPayload['user']['id']
+        )
+    );
+
+    echo $slack->apiCall(
+        $WRITE_TOKEN,
+        'users.profile.set',
+        array(
+            'fields' => array(
+                // pronouns
+                'XfRPC4V6EP' => array(
+                    'value' => 'she/her'
+                ),
+                // committee
+                'XfQYNRUN1W' => array(
+                    'value' => 'Finance & Development'
+                )
+            )
+        )
+    );
+
+
 }
 
 if (isset($eventPayload['event'])) {

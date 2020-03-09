@@ -1,49 +1,65 @@
 <?php
 
-function signInWithSlack($client_id, $client_secret, $web_token, $password) {
+function getSlackConfig() {
+    // get config from db
+    $sql = "SELECT * FROM sl_config";
+    $result = $conn->query($sql);
+    while ($row = $result->fetch_assoc()) {
+        $config[$row['sl_key']] = $row['sl_value'];
+    };
+
+    return $config;
+}
+
+function signInWithSlack($conn) {
+    // get config from db
+    $config = getSlackConfig();
+
     // previous login
     if (isset($_COOKIE['token'])) {
-        $token = $_COOKIE['token'];
+        $config['user_token'] = $_COOKIE['token'];
     }
     // new login
     else if (isset($_GET['code'])) {
         $auth = json_decode(file_get_contents(
             'https://slack.com/api/oauth.access?' .
-            'client_id=' . $client_id .
-            '&client_secret=' . $client_secret .
+            'client_id=' . $config['CLIENT_ID'] .
+            '&client_secret=' . $config['CLIENT_SECRET'] .
             '&code=' . $_GET['code']
         ), true);
 
-        $token = $auth['access_token'];
-        setcookie('token', $token, strtotime( '+30 days' ), '/');
+        $config['user_token'] = $auth['access_token'];
+        setcookie('token', $config['user_token'], strtotime( '+30 days' ), '/');
     }
     // no access
     else {
         return false;
     }
 
-    return new Slack($token, $web_token, $password);
+    return new Slack($conn, $config);
 }
 
 class Slack {
-    public $token;
+    public $conn;
+    public $config;
     public $userInfo;
     public $authed;
 
-    public function __construct($token, $web_token, $password) {
-        $this->token = $token;
+    public function __construct($conn, $config = null) {
+        // if skipped sign in step, get config (bot)
+        if (!$config) {
+            $config = getSlackConfig();
+        }
 
-        $identityCheck = json_decode($this->apiCall('users.identity'), true);
+        $this->conn = $conn;
+        $this->config = $config;
+
+        $identityCheck = json_decode($this->apiCall('users.identity', null, 'user'), true);
 
         $this->userInfo = $identityCheck['user'];
         $this->authed = $identityCheck['ok'];
 
         if ($this->authed) {
-            $this->db = new Database($password);
-
-            // authorized user - replace their token with elevated one
-            $this->token = $web_token;
-
             // get list of all users for reference?
             // $this->userLookup = json_decode($this->apiCall('users.list'), true);
 
@@ -57,7 +73,7 @@ class Slack {
                 array('user' => $this->userId)
             ), true)['profile'];
 
-            $houseDetails = $this->db->query("
+            $houseDetails = $this->conn->query("
                 select h.name, u.boarder from sl_users as u left join sl_houses as h on u.house_id = h.id where u.slack_user_id = '$this->userId'
             ");
 
@@ -71,7 +87,17 @@ class Slack {
         }
     }
 
-    public function apiCall($method, $params = array()) {
+    public function apiCall($method, $params = array(), $type = 'read') {
+        if ($type == 'user') {
+            $token = $this->config['user_token'];
+        }
+        else if ($type == 'write') {
+            $token = $this->config['WRITE_TOKEN'];
+        }
+        else {
+            $token = $this->config['READ_TOKEN'];
+        }
+        
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
@@ -79,7 +105,7 @@ class Slack {
             CURLOPT_POSTFIELDS => json_encode($params),
             CURLOPT_HTTPHEADER => array(
                 "Content-Type: application/json",
-                "Authorization: Bearer " . $this->token
+                "Authorization: Bearer " . $token
             ),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_ENCODING => "",
@@ -97,56 +123,22 @@ class Slack {
     }
 }
 
-class Database {
-    public $conn;
+// public function userUpdate($user_id, $update) {
+//     $conn = $this->conn;
 
-    public function __construct($password) {
-        $DB_SERVERNAME = "mysql.rchc.coop";
-        $DB_USERNAME = "rchccoop1";
-        $DB_DATABASE = "rchc_coop_1";
+//     $columns = array_keys($update);
+//     $values = array();
 
-        // Create connection
-        $this->conn = new mysqli($DB_SERVERNAME, $DB_USERNAME, $password, $DB_DATABASE);
+//     foreach ($columns as $column) {
+//         $values[] = $update[$column];
+//     }
 
-        // Check connection
-        if ($this->conn->connect_error) {
-            die("Connection failed: " . $this->conn->connect_error);
-        }
+//     $columnList = implode(',', $columns);
+//     $valueList = '"' . implode('","', $values) . '"';
 
-        // get slack config
-        // $sql = 'select * from sl_config';
-        // $result = $conn->query($sql);
-        // while ($row = $result->fetch_assoc()) {
-        //     $config[$row['sl_key']] = $row['sl_value'];
-        // }
-    }
-    public function query($sql) {
-        $result = $this->conn->query($sql);
+//     $sql = "insert into sl_users (slack_user_id, $columnList) values ('$user_id', $valueList) on duplicate key update slack_username = values(slack_username), house_id = values(house_id), committee_id = values(committee_id)";
 
-        if ($result->num_rows > 0) {
-            return $result->fetch_assoc();
-        }
-        else {
-            return false;
-        }
-    }
-    public function userUpdate($user_id, $update) {
-        $conn = $this->conn;
+//     $result = $conn->query($sql);
 
-        $columns = array_keys($update);
-        $values = array();
-
-        foreach ($columns as $column) {
-            $values[] = $update[$column];
-        }
-
-        $columnList = implode(',', $columns);
-        $valueList = '"' . implode('","', $values) . '"';
-
-        $sql = "insert into sl_users (slack_user_id, $columnList) values ('$user_id', $valueList) on duplicate key update slack_username = values(slack_username), house_id = values(house_id), committee_id = values(committee_id)";
-
-        $result = $conn->query($sql);
-
-        return json_encode($result);
-    }
-}
+//     return json_encode($result);
+// }
