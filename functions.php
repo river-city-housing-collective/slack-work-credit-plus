@@ -121,24 +121,29 @@ class Slack {
         curl_close($curl);
         return $response;
     }
+
+    public function updateUserDb($user_id, $update) {
+        $columns = array_keys($update);
+        $values = array();
+
+        foreach ($columns as $column) {
+            $values[] = $update[$column];
+        }
+
+        $columnList = implode(',', $columns);
+        $valueList = '"' . implode('","', $values) . '"';
+
+        $sql = "
+            insert into sl_users (slack_user_id, $columnList)
+                values ('$user_id', $valueList)
+            on duplicate key update
+                slack_username = values(slack_username),
+                house_id = values(house_id),
+                committee_id = values(committee_id)
+        ";
+
+        $result = $this->conn->query($sql);
+
+        return json_encode($result);
+    }
 }
-
-// public function userUpdate($user_id, $update) {
-//     $conn = $this->conn;
-
-//     $columns = array_keys($update);
-//     $values = array();
-
-//     foreach ($columns as $column) {
-//         $values[] = $update[$column];
-//     }
-
-//     $columnList = implode(',', $columns);
-//     $valueList = '"' . implode('","', $values) . '"';
-
-//     $sql = "insert into sl_users (slack_user_id, $columnList) values ('$user_id', $valueList) on duplicate key update slack_username = values(slack_username), house_id = values(house_id), committee_id = values(committee_id)";
-
-//     $result = $conn->query($sql);
-
-//     return json_encode($result);
-// }

@@ -48,17 +48,16 @@ if ($eventPayload['type'] == 'message_action') {
 else if ($eventPayload['type'] == 'block_actions') {
     $user_id = $eventPayload['user']['id'];
 
-    // echo $db->userLookup($eventPayload['user']['id']);
-
-    echo $db->userUpdate($user_id, array(
+    // save user info to db
+    echo $slack->updateUserDb($user_id, array(
         'slack_username' => $eventPayload['user']['username'],
         'house_id' => $eventPayload['actions'][0]['selected_option']['value'],
         'committee_id' => 3
     ));
 
-    //update usergroup
+    //update slack usergroup
     echo $slack->apiCall(
-        $WRITE_TOKEN,
+        $slack->config['WRITE_TOKEN'],
         'usergroups.users.update',
         array(
             'usergroup' => $eventPayload['actions'][0]['selected_option']['value'],
@@ -66,8 +65,9 @@ else if ($eventPayload['type'] == 'block_actions') {
         )
     );
 
+    // update slack profile
     echo $slack->apiCall(
-        $WRITE_TOKEN,
+        $slack->config['WRITE_TOKEN'],
         'users.profile.set',
         array(
             'fields' => array(
@@ -82,8 +82,6 @@ else if ($eventPayload['type'] == 'block_actions') {
             )
         )
     );
-
-
 }
 
 if (isset($eventPayload['event'])) {
