@@ -1,6 +1,6 @@
 <?php
 
-function getSlackConfig() {
+function getSlackConfig($conn) {
     // get config from db
     $sql = "SELECT * FROM sl_config";
     $result = $conn->query($sql);
@@ -13,7 +13,7 @@ function getSlackConfig() {
 
 function signInWithSlack($conn) {
     // get config from db
-    $config = getSlackConfig();
+    $config = getSlackConfig($conn);
 
     // previous login
     if (isset($_COOKIE['token'])) {
@@ -48,7 +48,7 @@ class Slack {
     public function __construct($conn, $config = null) {
         // if skipped sign in step, get config (bot)
         if (!$config) {
-            $config = getSlackConfig();
+            $config = getSlackConfig($conn);
         }
 
         $this->conn = $conn;
