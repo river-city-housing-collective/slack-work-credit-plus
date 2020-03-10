@@ -22,6 +22,7 @@
 			"type": "divider"
 		},
 		{
+			"block_id": "house",
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
@@ -71,6 +72,7 @@
 			}
 		},
 		{
+			"block_id": "room",
 			"type": "input",
 			"element": {
 				"type": "plain_text_input"
@@ -82,6 +84,7 @@
 			}
         },
         {
+			"block_id": "committee",
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
@@ -150,6 +153,7 @@
 			"type": "divider"
 		},
 		{
+			"block_id": "pronouns",
 			"type": "input",
 			"element": {
 				"type": "plain_text_input"

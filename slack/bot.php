@@ -1,5 +1,4 @@
 <?php
-
 error_reporting(E_ALL);
 ini_set('display_errors', 'on');
 
@@ -9,7 +8,7 @@ require_once('../dbconnect.php');
 require_once('../functions.php');
 
 // create new slack object
-$slack = new Slack($conn);
+$slack = new Slack($conn, 'bot');
 
 // get incoming object to work with
 if (isset($_POST['payload'])) {
@@ -41,47 +40,84 @@ if ($eventPayload['type'] == 'message_action') {
 
     echo $slack->apiCall(
         'views.open',
-        $json
+        $json,
+        'bot'
     );
 }
-// when select changes on modal
 else if ($eventPayload['type'] == 'block_actions') {
     $user_id = $eventPayload['user']['id'];
 
-    // save user info to db
-    echo $slack->updateUserDb($user_id, array(
-        'slack_username' => $eventPayload['user']['username'],
-        'house_id' => $eventPayload['actions'][0]['selected_option']['value'],
-        'committee_id' => 3
-    ));
+    $users = $slack->apiCall(
+        'usergroups.users.list',
+        'usergroup=SQKUQC4F4',
+        'read',
+        true
+    );
+
+    echo $users;
 
     //update slack usergroup
-    echo $slack->apiCall(
-        $slack->config['WRITE_TOKEN'],
-        'usergroups.users.update',
-        array(
-            'usergroup' => $eventPayload['actions'][0]['selected_option']['value'],
-            'users' => $eventPayload['user']['id']
-        )
-    );
+    // echo $slack->apiCall(
+    //     $slack->config['WRITE_TOKEN'],
+    //     'usergroups.users.update',
+    //     array(
+    //         'usergroup' => $eventPayload['actions'][0]['selected_option']['value'],
+    //         'users' => $eventPayload['user']['id']
+    //     )
+    // );
+
+    // echo json_encode($eventPayload);
+}
+// on modal submit
+else if ($eventPayload['type'] == 'view_submission') {
+    $user_id = $eventPayload['user']['id'];
+
+    // save user info to db
+    // echo $slack->updateUserDb($user_id, array(
+    //     'slack_username' => $eventPayload['user']['username'],
+    //     'house_id' => $eventPayload['actions'][0]['selected_option']['value'],
+    //     'committee_id' => 3
+    // ));
+
+    $blocks = array();
+
+    foreach ($eventPayload['view']['blocks'] as $block) {
+        if (isset($block['element'])) {
+            $blocks[$block['block_id']] = array(
+                'block_id' => $block['block_id'],
+                'action_id' => $block['element']['action_id']
+            );
+        }
+    }
 
     // update slack profile
-    echo $slack->apiCall(
-        $slack->config['WRITE_TOKEN'],
+    $slack->apiCall(
         'users.profile.set',
         array(
-            'fields' => array(
-                // pronouns
-                'XfRPC4V6EP' => array(
-                    'value' => 'she/her'
-                ),
-                // committee
-                'XfQYNRUN1W' => array(
-                    'value' => 'Finance & Development'
+            'user' => $eventPayload['user']['id'],
+            'profile' => array(
+                'fields' => array(
+                    // pronouns
+                    'XfRPC4V6EP' => array(
+                        'value' => $eventPayload
+                        ['view']
+                        ['state']
+                        ['values']
+                        [$blocks['pronouns']['block_id']]
+                        [$blocks['pronouns']['action_id']]
+                        ['value']
+                    ),
+                    // committee
+                    'XfQYNRUN1W' => array(
+                        'value' => 'Finance & Development'
+                    )
                 )
             )
-        )
+        ),
+        'write'
     );
+
+    header("HTTP/1.1 204 NO CONTENT");
 }
 
 if (isset($eventPayload['event'])) {

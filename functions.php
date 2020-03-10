@@ -46,18 +46,20 @@ class Slack {
     public $authed;
 
     public function __construct($conn, $config = null) {
-        // if skipped sign in step, get config (bot)
-        if (!$config) {
-            $config = getSlackConfig($conn);
-        }
-
         $this->conn = $conn;
-        $this->config = $config;
 
-        $identityCheck = json_decode($this->apiCall('users.identity', null, 'user'), true);
+        // if skipped sign in step, get config (bot)
+        if ($config == 'bot') {
+            $this->config = getSlackConfig($conn);
+        }
+        else {
+            $this->config = $config;
 
-        $this->userInfo = $identityCheck['user'];
-        $this->authed = $identityCheck['ok'];
+            $identityCheck = json_decode($this->apiCall('users.identity', null, 'user'), true);
+
+            $this->userInfo = $identityCheck['user'];
+            $this->authed = $identityCheck['ok'];
+        }
 
         if ($this->authed) {
             // get list of all users for reference?
@@ -87,9 +89,12 @@ class Slack {
         }
     }
 
-    public function apiCall($method, $params = array(), $type = 'read') {
+    public function apiCall($method, $params = array(), $type = 'read', $urlencoded) {
         if ($type == 'user') {
-            $token = $this->config['user_token'];
+            $token = $this->config['token'];
+        }
+        else if ($type == 'bot') {
+            $token = $this->config['BOT_TOKEN'];
         }
         else if ($type == 'write') {
             $token = $this->config['WRITE_TOKEN'];
@@ -102,9 +107,9 @@ class Slack {
 
         curl_setopt_array($curl, array(
             CURLOPT_URL => "https://slack.com/api/" . $method,
-            CURLOPT_POSTFIELDS => json_encode($params),
+            CURLOPT_POSTFIELDS => $urlencoded ? $params : json_encode($params),
             CURLOPT_HTTPHEADER => array(
-                "Content-Type: application/json",
+                "Content-Type: application/" . $urlencoded ? "x-www-form-urlencoded" : "json",
                 "Authorization: Bearer " . $token
             ),
             CURLOPT_RETURNTRANSFER => true,
