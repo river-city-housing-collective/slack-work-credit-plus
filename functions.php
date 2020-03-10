@@ -127,28 +127,26 @@ class Slack {
         return $response;
     }
 
-    public function updateUserDb($user_id, $update) {
-        $columns = array_keys($update);
-        $values = array();
+    public function addToUsergroup($user_id, $usergroup_id) {
+        // get current list of users
+        $users = $this->apiCall(
+            'usergroups.users.list',
+            'usergroup=' . $usergroup_id,
+            'read',
+            true
+        );
 
-        foreach ($columns as $column) {
-            $values[] = $update[$column];
-        }
+        // add new user
+        array_push($users, $user_id);
 
-        $columnList = implode(',', $columns);
-        $valueList = '"' . implode('","', $values) . '"';
-
-        $sql = "
-            insert into sl_users (slack_user_id, $columnList)
-                values ('$user_id', $valueList)
-            on duplicate key update
-                slack_username = values(slack_username),
-                house_id = values(house_id),
-                committee_id = values(committee_id)
-        ";
-
-        $result = $this->conn->query($sql);
-
-        return json_encode($result);
+        // save updated list
+        $this->apiCall(
+            'usergroups.users.update',
+            array(
+                'usergroup' => $usergroup_id,
+                'users' => $users
+            ),
+            'write'
+        );
     }
 }

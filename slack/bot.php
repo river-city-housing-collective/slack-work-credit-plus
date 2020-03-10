@@ -1,13 +1,17 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 'on');
+
+// error reporting (local only)
+if ($_SERVER["REMOTE_ADDR"] == '127.0.0.1') {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 'on');
+}
 
 header('Content-Type: application/json');
 
 require_once('../dbconnect.php');
 require_once('../functions.php');
 
-// create new slack object
+// create new slack object with bot token
 $slack = new Slack($conn, 'bot');
 
 // get incoming object to work with
@@ -31,7 +35,8 @@ if ($eventPayload['type'] == 'url_verification') {
 //     exit();
 // }
 
-// display modal
+// display onboarding modal
+// todo should happen on new user join (maybe updatable via second modal?)
 if ($eventPayload['type'] == 'message_action') {
     $json = array(
         'trigger_id' => $eventPayload['trigger_id'],
@@ -47,40 +52,40 @@ if ($eventPayload['type'] == 'message_action') {
 else if ($eventPayload['type'] == 'block_actions') {
     $user_id = $eventPayload['user']['id'];
 
-    $users = $slack->apiCall(
-        'usergroups.users.list',
-        'usergroup=SQKUQC4F4',
-        'read',
-        true
-    );
-
-    echo $users;
-
-    //update slack usergroup
-    // echo $slack->apiCall(
-    //     $slack->config['WRITE_TOKEN'],
-    //     'usergroups.users.update',
-    //     array(
-    //         'usergroup' => $eventPayload['actions'][0]['selected_option']['value'],
-    //         'users' => $eventPayload['user']['id']
-    //     )
-    // );
-
-    // echo json_encode($eventPayload);
+    if ($eventPayload['block_id'] == 'house') { // todo prob wrong
+        $sql = "
+            insert into sl_users (slack_user_id, house_id)
+                values ('$user_id', $id)
+            on duplicate key update
+                house_id = values(house_id)
+        ";
+    }
+    else if ($eventPayload['block_id'] == 'committee') { // todo prob wrong
+        $sql = "
+            insert into sl_users (slack_user_id, committee_id)
+                values ('$user_id', $id)
+            on duplicate key update
+                committee_id = values(committee_id)
+        ";
+    }
+    else if ($eventPayload['block_id'] == 'room') { // todo prob wrong
+        $sql = "
+            insert into sl_users (slack_user_id, room_id)
+                values ('$user_id', $id)
+            on duplicate key update
+                room_id = values(room_id)
+        ";
+    }
+    // save user info to db
+    $slack->conn->query($sql);
 }
 // on modal submit
 else if ($eventPayload['type'] == 'view_submission') {
     $user_id = $eventPayload['user']['id'];
 
-    // save user info to db
-    // echo $slack->updateUserDb($user_id, array(
-    //     'slack_username' => $eventPayload['user']['username'],
-    //     'house_id' => $eventPayload['actions'][0]['selected_option']['value'],
-    //     'committee_id' => 3
-    // ));
-
     $blocks = array();
 
+    // todo prob just need pronouns
     foreach ($eventPayload['view']['blocks'] as $block) {
         if (isset($block['element'])) {
             $blocks[$block['block_id']] = array(
@@ -90,6 +95,22 @@ else if ($eventPayload['type'] == 'view_submission') {
         }
     }
 
+    // get user info from db
+    $sql = "
+        select
+            u.house_id,
+            u.committee_id,
+            h.slack_group_id as 'slack_house_id',
+            c.slack_group_id as 'slack_committee_id',
+            c.name as 'committee_name'
+        from sl_users as u
+        left join sl_houses as h on h.`id` = u.`house_id`
+        left join sl_committees as c on c.`id` = u.`committee_id`
+        where u.slack_user_id = '$user_id'
+    ";
+    $result = $slack->conn->query($sql);
+    $userDbInfo = $result->fetch_assoc();
+
     // update slack profile
     $slack->apiCall(
         'users.profile.set',
@@ -98,7 +119,7 @@ else if ($eventPayload['type'] == 'view_submission') {
             'profile' => array(
                 'fields' => array(
                     // pronouns
-                    'XfRPC4V6EP' => array(
+                    $slack->config['PRONOUNS_FIELD_ID'] => array(
                         'value' => $eventPayload
                         ['view']
                         ['state']
@@ -108,8 +129,8 @@ else if ($eventPayload['type'] == 'view_submission') {
                         ['value']
                     ),
                     // committee
-                    'XfQYNRUN1W' => array(
-                        'value' => 'Finance & Development'
+                    $slack->config['COMMITTEE_FIELD_ID'] => array(
+                        'value' => $userDbInfo['committee_name'] // todo make sure this is string and not coded?
                     )
                 )
             )
@@ -117,8 +138,12 @@ else if ($eventPayload['type'] == 'view_submission') {
         'write'
     );
 
+    $slack->addToUsergroup($user_id, $userDbInfo['slack_house_id']);
+    $slack->addToUsergroup($user_id, $userDbInfo['slack_committee_id']);
+
     header("HTTP/1.1 204 NO CONTENT");
 }
+// todo on cancel - delete user from db....or at least wipe out usergroup associations
 
 if (isset($eventPayload['event'])) {
     // testing - if 'baby yoda' do stuff
