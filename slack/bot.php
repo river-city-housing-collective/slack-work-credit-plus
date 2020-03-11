@@ -49,33 +49,42 @@ if ($eventPayload['type'] == 'message_action') {
         'bot'
     );
 }
+// todo add app home stuff?
+// else if ($eventPayload['type'] == 'app_home_opened') {
+// }
 else if ($eventPayload['type'] == 'block_actions') {
     $user_id = $eventPayload['user']['id'];
+    $block_id = $eventPayload['actions'][0]['block_id'];
+    $value = $eventPayload['actions'][0]['selected_option']['value'];
 
-    if ($eventPayload['block_id'] == 'house') { // todo prob wrong
+    if ($block_id == 'house') {
         $sql = "
             insert into sl_users (slack_user_id, house_id)
-                values ('$user_id', $id)
+                values ('$user_id', $value)
             on duplicate key update
                 house_id = values(house_id)
         ";
     }
-    else if ($eventPayload['block_id'] == 'committee') { // todo prob wrong
+    else if ($block_id == 'committee') {
         $sql = "
             insert into sl_users (slack_user_id, committee_id)
-                values ('$user_id', $id)
+                values ('$user_id', $value)
             on duplicate key update
                 committee_id = values(committee_id)
         ";
     }
-    else if ($eventPayload['block_id'] == 'room') { // todo prob wrong
-        $sql = "
-            insert into sl_users (slack_user_id, room_id)
-                values ('$user_id', $id)
-            on duplicate key update
-                room_id = values(room_id)
-        ";
-    }
+    // todo populate list from db
+    // else if ($block_id == 'room') {
+    //     $result = $slack->conn->query("select id from sl_rooms where room = '$value'");
+    //     $value = $result->fetch_assoc()['id'];
+
+    //     $sql = "
+    //         insert into sl_users (slack_user_id, room_id)
+    //             values ('$user_id', $value)
+    //         on duplicate key update
+    //             room_id = values(room_id)
+    //     ";
+    // }
     // save user info to db
     $slack->conn->query($sql);
 }
@@ -83,16 +92,56 @@ else if ($eventPayload['type'] == 'block_actions') {
 else if ($eventPayload['type'] == 'view_submission') {
     $user_id = $eventPayload['user']['id'];
 
+    // get all input fields
     $blocks = array();
-
-    // todo prob just need pronouns
     foreach ($eventPayload['view']['blocks'] as $block) {
         if (isset($block['element'])) {
-            $blocks[$block['block_id']] = array(
-                'block_id' => $block['block_id'],
-                'action_id' => $block['element']['action_id']
-            );
+            $block_id = $block['block_id'];
+            $action_id = $block['element']['action_id'];
+
+            $blocks[$block['block_id']] = $eventPayload
+                ['view']
+                ['state']
+                ['values']
+                [$block_id]
+                [$action_id]
+                ['value'];   
         }
+    }
+
+    // get user info from slack
+    $slackUserInfo = json_decode($slack->apiCall('users.profile.get',
+        array('user' => $user_id)
+    ), true)['profile'];
+    $first_name = $slackUserInfo['first_name'];
+    $last_name = $slackUserInfo['last_name'];
+    $email = $slackUserInfo['email'];
+
+    // get room id
+    $room = $blocks['room'];
+    $result = $slack->conn->query("select id from sl_rooms where room = '$room'");
+    $room = $result->fetch_assoc()['id'];
+
+    // save all that junk to db
+    $sql = "
+        insert into sl_users (slack_user_id, room_id, first_name, last_name, email)
+            values ('$user_id', $room, '$first_name', '$last_name', '$email')
+        on duplicate key update
+            room_id = values(room_id),
+            first_name = values(first_name),
+            last_name = values(last_name),
+            email = values(email)
+    ";
+    $result = $slack->conn->query($sql);
+
+    // if room was invalid, throw error
+    if (!$result) {
+        echo json_encode(array(
+            'response_action' => 'errors',
+            'errors' => array(
+                'room' => 'Please enter a valid room number.'
+            )
+        ));
     }
 
     // get user info from db
@@ -120,17 +169,11 @@ else if ($eventPayload['type'] == 'view_submission') {
                 'fields' => array(
                     // pronouns
                     $slack->config['PRONOUNS_FIELD_ID'] => array(
-                        'value' => $eventPayload
-                        ['view']
-                        ['state']
-                        ['values']
-                        [$blocks['pronouns']['block_id']]
-                        [$blocks['pronouns']['action_id']]
-                        ['value']
+                        'value' => $blocks['pronouns']
                     ),
                     // committee
                     $slack->config['COMMITTEE_FIELD_ID'] => array(
-                        'value' => $userDbInfo['committee_name'] // todo make sure this is string and not coded?
+                        'value' => $userDbInfo['committee_name']
                     )
                 )
             )
@@ -139,7 +182,10 @@ else if ($eventPayload['type'] == 'view_submission') {
     );
 
     $slack->addToUsergroup($user_id, $userDbInfo['slack_house_id']);
-    $slack->addToUsergroup($user_id, $userDbInfo['slack_committee_id']);
+
+    if ($userDbInfo['committee_id']) {
+        $slack->addToUsergroup($user_id, $userDbInfo['slack_committee_id']);
+    }
 
     header("HTTP/1.1 204 NO CONTENT");
 }

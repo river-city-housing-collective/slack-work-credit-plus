@@ -36,7 +36,7 @@ function signInWithSlack($conn) {
         return false;
     }
 
-    return new Slack($conn, $config);
+    return new Slack($conn, 'user', $config);
 }
 
 class Slack {
@@ -45,17 +45,21 @@ class Slack {
     public $userInfo;
     public $authed;
 
-    public function __construct($conn, $config = null) {
+    public function __construct($conn, $type = 'bot', $config = null) {
         $this->conn = $conn;
 
         // if skipped sign in step, get config (bot)
-        if ($config == 'bot') {
+        if ($type == 'bot') {
             $this->config = getSlackConfig($conn);
         }
         else {
             $this->config = $config;
 
+            echo json_encode($config);
+
             $identityCheck = json_decode($this->apiCall('users.identity', null, 'user'), true);
+
+            // echo json_encode($identityCheck);
 
             $this->userInfo = $identityCheck['user'];
             $this->authed = $identityCheck['ok'];
@@ -89,7 +93,7 @@ class Slack {
         }
     }
 
-    public function apiCall($method, $params = array(), $type = 'read', $urlencoded) {
+    public function apiCall($method, $params = array(), $type = 'read', $urlencoded = null) {
         if ($type == 'user') {
             $token = $this->config['token'];
         }
@@ -109,7 +113,7 @@ class Slack {
             CURLOPT_URL => "https://slack.com/api/" . $method,
             CURLOPT_POSTFIELDS => $urlencoded ? $params : json_encode($params),
             CURLOPT_HTTPHEADER => array(
-                "Content-Type: application/" . $urlencoded ? "x-www-form-urlencoded" : "json",
+                "Content-Type: application/" . ($urlencoded ? "x-www-form-urlencoded" : "json"),
                 "Authorization: Bearer " . $token
             ),
             CURLOPT_RETURNTRANSFER => true,
@@ -129,12 +133,12 @@ class Slack {
 
     public function addToUsergroup($user_id, $usergroup_id) {
         // get current list of users
-        $users = $this->apiCall(
+        $users = json_decode($this->apiCall(
             'usergroups.users.list',
             'usergroup=' . $usergroup_id,
             'read',
             true
-        );
+        ), true)['users'];
 
         // add new user
         array_push($users, $user_id);
@@ -147,6 +151,12 @@ class Slack {
                 'users' => $users
             ),
             'write'
+        );
+    }
+
+    public function importSlackUsersToDb() {
+        return $this->apiCall(
+            'users.list'
         );
     }
 }
