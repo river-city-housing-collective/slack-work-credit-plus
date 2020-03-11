@@ -40,7 +40,7 @@ if ($eventPayload['type'] == 'url_verification') {
 if ($eventPayload['type'] == 'message_action') {
     $json = array(
         'trigger_id' => $eventPayload['trigger_id'],
-        'view' => json_decode(file_get_contents('modals/onboard.json'), TRUE)
+        'view' => json_decode(file_get_contents('views/onboard-modal.json'), TRUE)
     );
 
     echo $slack->apiCall(

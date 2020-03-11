@@ -44,6 +44,7 @@ class Slack {
     public $config;
     public $userInfo;
     public $authed;
+    public $admin;
 
     public function __construct($conn, $type = 'bot', $config = null) {
         $this->conn = $conn;
@@ -55,47 +56,48 @@ class Slack {
         else {
             $this->config = $config;
 
-            echo json_encode($config);
-
-            $identityCheck = json_decode($this->apiCall('users.identity', null, 'user'), true);
-
-            // echo json_encode($identityCheck);
+            $identityCheck = json_decode($this->apiCall('users.identity', array(), 'user'), true);
+            // todo additional check for admin status if accessing admin tools
 
             $this->userInfo = $identityCheck['user'];
             $this->authed = $identityCheck['ok'];
         }
 
         if ($this->authed) {
-            // get list of all users for reference?
-            // $this->userLookup = json_decode($this->apiCall('users.list'), true);
-
             $this->userGroups = json_decode($this->apiCall('usergroups.list'), true);
 
             // save user id for future calls
             $this->userId = $this->userInfo['id'];
 
             // get specifics about logged in user
-            $slackUserInfo = json_decode($this->apiCall('users.profile.get',
-                array('user' => $this->userId)
-            ), true)['profile'];
+            $slackUserInfo = json_decode($this->apiCall(
+                'users.info',
+                'user=' . $this->userId,
+                'read',
+                true
+            ), true)['user'];
+            
+            $this->admin = $slackUserInfo['is_admin'];
+            $slackUserInfo = $slackUserInfo['profile'];
 
             $houseDetails = $this->conn->query("
-                select h.name, u.boarder from sl_users as u left join sl_houses as h on u.house_id = h.id where u.slack_user_id = '$this->userId'
-            ");
+                select h.name, u.committee_id from sl_users as u left join sl_houses as h on u.house_id = h.id where u.slack_user_id = '$this->userId'
+            ")->fetch_assoc();
 
             // pare down to the essentials
             $this->userInfo = array(
                 'display_name' => $slackUserInfo['display_name'],
                 'avatar' => $slackUserInfo['image_72'],
                 'house' => $houseDetails['name'],
-                'boarder' => $houseDetails['boarder']
+                'type' => $houseDetails['committee_id'] == 0 ? 'Boarder' : 'Resident'
             );
         }
     }
 
+    // todo clean up - add option to return json or not
     public function apiCall($method, $params = array(), $type = 'read', $urlencoded = null) {
         if ($type == 'user') {
-            $token = $this->config['token'];
+            $token = $this->config['user_token'];
         }
         else if ($type == 'bot') {
             $token = $this->config['BOT_TOKEN'];
@@ -106,12 +108,17 @@ class Slack {
         else {
             $token = $this->config['READ_TOKEN'];
         }
+
+        // echo $method;
+        // echo json_encode($params);
+        // echo $type;
+        // echo $urlencoded;
         
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
             CURLOPT_URL => "https://slack.com/api/" . $method,
-            CURLOPT_POSTFIELDS => $urlencoded ? $params : json_encode($params),
+            CURLOPT_POSTFIELDS => $urlencoded ? $params : json_encode($params), // todo auto format array into urlencoded
             CURLOPT_HTTPHEADER => array(
                 "Content-Type: application/" . ($urlencoded ? "x-www-form-urlencoded" : "json"),
                 "Authorization: Bearer " . $token
@@ -155,8 +162,44 @@ class Slack {
     }
 
     public function importSlackUsersToDb() {
-        return $this->apiCall(
+        $users = json_decode($this->apiCall(
             'users.list'
-        );
+        ), true)['members'];
+
+        $sql = 'insert into sl_users (
+            slack_user_id,
+            slack_username,
+            first_name,
+            last_name,
+            real_name,
+            is_admin,
+            deleted
+        ) values ';
+        $values = array();
+
+        foreach ($users as $user) {
+            if (!$user['is_bot'] && $user['id'] != 'USLACKBOT') {
+                $values[] = "('" .
+                    $user['id'] . "', '" .
+                    $user['name'] . "', '" .
+                    $user['profile']['first_name'] . "', '" .
+                    $user['profile']['last_name'] . "', '" .
+                    $user['profile']['real_name'] . "', " .
+                    ($user['is_admin'] ? 'true' : 'false') . ", " .
+                    ($user['deleted'] ? 'true' : 'false') . ")";
+            }
+        }
+
+        $sql .= implode(',', $values);
+        $sql .= ' on duplicate key update
+        slack_user_id = values(slack_user_id),
+        slack_username = values(slack_username),
+        first_name = values(first_name),
+        last_name = values(last_name),
+        real_name = values(real_name),
+        is_admin = values(is_admin),
+        deleted = values(deleted)';
+
+        echo $sql;
     }
 }

@@ -1,6 +1,6 @@
 <?php
-require_once('/home/isaneu/rchc.coop/dbconnect.php');
-require_once('/home/isaneu/rchc.coop/functions.php');
+require_once('dbconnect.php');
+require_once('functions.php');
 
 if (isset($_GET['logout'])) {
     echo 'logged out?';
@@ -12,8 +12,6 @@ if (isset($_GET['logout'])) {
 
 // create new slack object (if authenticated)
 $slack = signInWithSlack($conn);
-
-echo json_encode($slack);
 
 if (!$slack->authed) {
     // show "sign in with slack" button
