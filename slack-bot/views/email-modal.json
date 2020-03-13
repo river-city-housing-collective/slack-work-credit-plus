@@ -1,0 +1,97 @@
+{
+	"type": "modal",
+	"callback_id": "email_modal",
+	"title": {
+		"type": "plain_text",
+		"text": "Email Community",
+		"emoji": true
+	},
+	"submit": {
+		"type": "plain_text",
+		"text": "Send",
+		"emoji": true
+	},
+	"close": {
+		"type": "plain_text",
+		"text": "Cancel",
+		"emoji": true
+	},
+	"blocks": [
+		{
+			"block_id": "house_id",
+			"type": "input",
+			"element": {
+				"type": "static_select",
+				"placeholder": {
+					"type": "plain_text",
+					"text": "Select",
+					"emoji": true
+				},
+				"options": [
+					{
+						"text": {
+							"type": "plain_text",
+							"text": "All RCHC Members",
+							"emoji": true
+						},
+						"value": "0"
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": "Anomy",
+							"emoji": true
+						},
+						"value": "2"
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": "Bloom",
+							"emoji": true
+						},
+						"value": "3"
+					},
+                    {
+						"text": {
+							"type": "plain_text",
+							"text": "Summit",
+							"emoji": true
+						},
+						"value": "1"
+					}
+				]
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "To:",
+				"emoji": true
+			}
+		},
+		{
+			"block_id": "subject",
+			"type": "input",
+			"element": {
+				"type": "plain_text_input"
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Subject",
+				"emoji": true
+			}
+		},
+		{
+			"block_id": "body",
+			"type": "input",
+			"element": {
+				"type": "plain_text_input",
+				"multiline": true
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Body",
+				"emoji": true
+			}
+		}
+	]
+}

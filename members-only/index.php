@@ -5,4 +5,9 @@ require_once('../auth.php');
 include('../includes.php');
 ?>
 
-<a href="work-credit">Work Credit</a>
+<ul>
+    <li><a href="work-credit">Work Credit</a></li>
+    <? if ($slack->admin) {
+        echo '<li><a href="admin.php">Admin Tools</a></li>';
+    } ?>
+</ul>

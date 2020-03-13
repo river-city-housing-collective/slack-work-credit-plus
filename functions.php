@@ -57,7 +57,6 @@ class Slack {
             $this->config = $config;
 
             $identityCheck = json_decode($this->apiCall('users.identity', array(), 'user'), true);
-            // todo additional check for admin status if accessing admin tools
 
             $this->userInfo = $identityCheck['user'];
             $this->authed = $identityCheck['ok'];
@@ -173,7 +172,8 @@ class Slack {
             last_name,
             real_name,
             is_admin,
-            deleted
+            deleted,
+            email
         ) values ';
         $values = array();
 
@@ -186,7 +186,8 @@ class Slack {
                     $user['profile']['last_name'] . "', '" .
                     $user['profile']['real_name'] . "', " .
                     ($user['is_admin'] ? 'true' : 'false') . ", " .
-                    ($user['deleted'] ? 'true' : 'false') . ")";
+                    ($user['deleted'] ? 'true' : 'false') . ", '" .
+                    $user['profile']['email'] . "')";
             }
         }
 
@@ -198,8 +199,26 @@ class Slack {
         last_name = values(last_name),
         real_name = values(real_name),
         is_admin = values(is_admin),
-        deleted = values(deleted)';
+        deleted = values(deleted),
+        email = values(email)';
 
-        echo $sql;
+        echo $this->conn->query($sql);
+    }
+
+    // todo enable! it's ready
+    public function sendEmail($house = null, $subject, $body) {
+        $sql = "select email from sl_users where house_id = $house";
+        $result = $this->conn->query($sql);
+
+        while ($row = $result->fetch_assoc()) {
+            $emails[] = $row['email'];
+        }
+
+        $body .= implode(',', $emails);
+
+        $to = "izneuhaus@gmail.com";
+        $headers = "From: baby.yoda@rchc.coop";
+
+        mail($to,$subject,$body,$headers);
     }
 }

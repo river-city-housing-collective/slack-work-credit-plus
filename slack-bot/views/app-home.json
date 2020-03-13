@@ -1,0 +1,93 @@
+{
+	"type": "home",
+	"blocks": [
+		{
+			"type": "image",
+			"title": {
+				"type": "plain_text",
+				"text": "Hi! What can I help you with today?",
+				"emoji": true
+			},
+			"image_url": "https://cnet1.cbsistatic.com/img/qyvVFsmGS_gKN54BWgUcAME-K0g=/1092x0/2019/11/19/2eddb56d-56a3-4569-874e-32cd61180d6a/babyyoda2.jpg",
+			"alt_text": "Baby Yoda"
+		},
+		{
+			"type": "divider"
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "*Work Credit*"
+			}
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "Track your contributions to the co-op!"
+			},
+			"accessory": {
+				"type": "button",
+				"text": {
+					"type": "plain_text",
+					"text": "Submit Time",
+					"emoji": true
+				},
+				"value": "submit_time"
+			}
+		},
+		{
+			"type": "divider"
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "*Send Email*"
+			}
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "Send an email to a specific house or the entire community"
+			},
+			"accessory": {
+				"type": "button",
+				"text": {
+					"type": "plain_text",
+					"text": "Email",
+					"emoji": true
+				},
+				"value": "send_email"
+			}
+		},
+		{
+			"type": "divider"
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "*Profile*"
+			}
+		},
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "Change your preferred name, pronouns, current house/room, committee affiliation"
+			},
+			"accessory": {
+				"type": "button",
+				"text": {
+					"type": "plain_text",
+					"text": "Update",
+					"emoji": true
+				},
+				"value": "edit_profile"
+			}
+		}
+	]
+}
