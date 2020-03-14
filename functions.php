@@ -205,20 +205,119 @@ class Slack {
         echo $this->conn->query($sql);
     }
 
-    // todo enable! it's ready
-    public function sendEmail($house = null, $subject, $body) {
-        $sql = "select email from sl_users where house_id = $house";
+    public function sendEmail($fromUserId, $subject, $body, $house_id = null, $reallySend = false) {
+        $sql = "
+            select
+                slack_user_id,
+                slack_username,
+                email,
+                house_id,
+                is_admin
+            from sl_users
+            where deleted <> 1";
+
         $result = $this->conn->query($sql);
 
+        // get email lists
         while ($row = $result->fetch_assoc()) {
-            $emails[] = $row['email'];
+            if ($row['slack_user_id'] == $fromUserId) {
+                $fromEmail = $row['email'];
+            }
+            if ($row['is_admin'] == 1) {
+                $adminEmails[] = $row['email'];
+            }
+            if (isset($house_id)) {
+                if ($row['house_id'] == $house_id) {
+                    $userEmails[] = $row['email'];
+                }
+            }
+            else {
+                $userEmails[] = $row['email'];
+            }
         }
 
-        $body .= implode(',', $emails);
+        // make sure author is included in email
+        $userEmails = array_unique(array_merge($userEmails, array($fromEmail)), SORT_REGULAR);
 
-        $to = "izneuhaus@gmail.com";
-        $headers = "From: baby.yoda@rchc.coop";
+        // note for bottom of email
+        $house = 'all current RCHC community members';
 
-        mail($to,$subject,$body,$headers);
+        // if house specific, get user readable name
+        if ($house_id) {
+            $sql = "select name from sl_houses where id = $house_id";
+            $result = $this->conn->query($sql);
+            $house = $result->fetch_assoc()['name'];
+            $house = 'all residents and boarders of ' . $house;
+        }
+
+        $body .= "\r\n\r\n" . '[This message was sent on behalf of ' . $fromEmail . ' to ' . $house . ']';
+
+        // check if this is a legit send or if we're just testing
+        if ($reallySend) {
+            // send to all relevant community members
+            $toEmails = $userEmails;
+
+            // CC all current admins
+            $cc = implode(',', $adminEmails);
+
+            $subject = '[RCHC] ' . $subject;
+        }
+        else {
+            $toEmails = $adminEmails;
+            $emailDump = implode("\r\n", $userEmails);
+
+            $subject = '[RCHC EMAIL TEST] ' . $subject;
+            $body .= "\r\n\r\n" . '---' . "\r\n" . "This email was intended for the following email addresses: " . "\r\n" . $emailDump;
+        }
+
+        $toEmails = implode(',', $toEmails);
+        $headers = 'From: baby-yoda@rchc.coop' . (isset($cc) ? "\r\n" . 'Cc: ' . $cc : '');
+
+        mail($toEmails, $subject, $body, $headers);
+    }
+
+    public function openModal($trigger_id, $view, $params = null) {
+        $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
+
+        if ($view == 'send-email-modal' && isset($params['body'])) {
+            // todo auto address based on channel origin
+            // $channel_id = $params['channel_id'];
+            // $result = $this->conn->query("select slack_usergroup_id from sl_houses where slack_channel_id = $channel_id");
+            // $house_id = $result->fetch_assoc()['id'];
+
+            $viewJson['blocks'][2]['element']['initial_value'] = $params['body'];
+        }
+
+        $json = array(
+            'trigger_id' => $trigger_id,
+            'view' => $viewJson
+        );
+
+        echo $this->apiCall(
+            'views.open',
+            $json,
+            'bot'
+        );
+    }
+
+    public function getInputValues($valuesObj) {
+        foreach ($valuesObj as $field => $data) {
+            $data = $data['value'];
+            $type = $data['type'];
+    
+            if ($type == 'datepicker') {
+                $value = $data['selected_date'];
+            }
+            else if ($type == 'static_select') {
+                $value = $data['selected_option']['value'];
+            }
+            else {
+                $value = $data['value'];
+            }
+    
+            $inputValues[$field] = $value;
+        }
+
+        return $inputValues;
     }
 }

@@ -1,7 +1,7 @@
 <?php
 
 // error reporting (local only)
-if ($_SERVER["REMOTE_ADDR"] == '127.0.0.1') {
+if ($_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1') {
     error_reporting(E_ALL);
     ini_set('display_errors', 'on');
 }
@@ -10,6 +10,7 @@ header('Content-Type: application/json');
 
 require_once('../dbconnect.php');
 require_once('../functions.php');
+
 // create new slack object with bot token
 $slack = new Slack($conn, 'bot');
 
@@ -21,95 +22,77 @@ else {
     $eventPayload = json_decode(file_get_contents("php://input"), TRUE);
 }
 
-// for testing - just return the payload
-// echo json_encode($eventPayload);
-// exit();
-
-// push latest app home view
-// todo better way of doing this
-$json = file_get_contents('views/app-home.json');
-$slack->apiCall(
-    'views.publish',
-    array(
-        "user_id" => 'UPC9446BB',
-        "view" => $json
-    ),
-    'bot'
-);
+// get requesting user id, event type
+$user_id = $eventPayload['user']['id'];
+$type = $eventPayload['type'];
 
 // to validate url
-if ($eventPayload['type'] == 'url_verification') {
+if ($type == 'url_verification') {
     echo $eventPayload['challenge'];
 }
 
-// if ($eventPayload['event']['user'] == 'UPC9446BB') {
-//     exit();
-// }
-
-// display onboarding modal
-// todo should happen on new user join (maybe updatable via second modal?)
-if ($eventPayload['type'] == 'message_action') {
-    $json = array(
-        'trigger_id' => $eventPayload['trigger_id'],
-        'view' => json_decode(file_get_contents('views/onboard-modal.json'), TRUE)
-    );
-
-    echo $slack->apiCall(
-        'views.open',
-        $json,
-        'bot'
-    );
+// get callback id if set
+if (isset($eventPayload['view'])) {
+    $callback_id = $eventPayload['view']['callback_id'];
 }
-// todo add app home stuff?
-// else if ($eventPayload['type'] == 'app_home_opened') {
-//     echo json_encode($eventPayload);
-// }
-else if ($eventPayload['type'] == 'block_actions') {
-    if ($eventPayload['actions'][0]['value'] == 'edit_profile') {
-        $json = array(
-            'trigger_id' => $eventPayload['trigger_id'],
-            'view' => json_decode(file_get_contents('views/onboard-modal.json'), TRUE)
-        );
+else if (isset($eventPayload['callback_id'])) {
+    $callback_id = $eventPayload['callback_id'];
+}
 
-        echo $slack->apiCall(
-            'views.open',
-            $json,
-            'bot'
-        );
+// for testing - just return the payload
+// echo 'PAYLOAD SENT - ' . json_encode($eventPayload);
+// exit();
+
+if ($type == 'message_action') {
+    $params = array(
+        'body' => $eventPayload['message']['text'],
+        'channel_id' => $eventPayload['channel']['id']
+    );
+
+    if ($callback_id == 'email') {
+        // todo enable for production
+        $slack->openModal($eventPayload['trigger_id'], 'send-email-modal', $params);
     }
-    else if ($eventPayload['actions'][0]['value'] == 'send_email') {
-        $json = array(
-            'trigger_id' => $eventPayload['trigger_id'],
-            'view' => json_decode(file_get_contents('views/email-modal.json'), TRUE)
-        );
-
-        echo $slack->apiCall(
-            'views.open',
-            $json,
-            'bot'
-        );
+}
+else if ($type == 'block_actions') {
+    if ($callback_id == 'app-home') {
+        $slack->openModal($eventPayload['trigger_id'], $eventPayload['actions'][0]['value']);
     }
     else {
-        $user_id = $eventPayload['user']['id'];
-        $block_id = $eventPayload['actions'][0]['block_id'];
-        $value = $eventPayload['actions'][0]['selected_option']['value'];
+        $view_id = $eventPayload['view']['id'];
+        $actionData = $eventPayload['actions'][0];
     
-        if ($block_id == 'house') {
-            $sql = "
-                insert into sl_users (slack_user_id, house_id)
-                    values ('$user_id', $value)
-                on duplicate key update
-                    house_id = values(house_id)
-            ";
-        }
-        else if ($block_id == 'committee') {
-            $sql = "
-                insert into sl_users (slack_user_id, committee_id)
-                    values ('$user_id', $value)
-                on duplicate key update
-                    committee_id = values(committee_id)
-            ";
-        }
+        $viewJson[$actionData['block_id']] = $actionData['selected_option']['value'];
+        $viewJson = json_encode($viewJson);
+    
+        // save input data to db
+        $sql = "
+            insert into sl_view_states (slack_user_id, slack_view_id, json)
+                values ('$user_id', '$view_id', '$viewJson')
+        ";
+        $slack->conn->query($sql);
+    }
+    // todo change these to static?
+    // else {
+        // $block_id = $eventPayload['actions'][0]['block_id'];
+        // $value = $eventPayload['actions'][0]['selected_option']['value'];
+    
+        // if ($block_id == 'house') {
+        //     $sql = "
+        //         insert into sl_users (slack_user_id, house_id)
+        //             values ('$user_id', $value)
+        //         on duplicate key update
+        //             house_id = values(house_id)
+        //     ";
+        // }
+        // else if ($block_id == 'committee') {
+        //     $sql = "
+        //         insert into sl_users (slack_user_id, committee_id)
+        //             values ('$user_id', $value)
+        //         on duplicate key update
+        //             committee_id = values(committee_id)
+        //     ";
+        // }
         // todo populate list from db
         // else if ($block_id == 'room') {
         //     $result = $slack->conn->query("select id from sl_rooms where room = '$value'");
@@ -123,38 +106,32 @@ else if ($eventPayload['type'] == 'block_actions') {
         //     ";
         // }
         // save user info to db
-        $slack->conn->query($sql);
-    }
+        // $slack->conn->query($sql);
+    // }
 }
 // on modal submit
-else if ($eventPayload['type'] == 'view_submission') {
-    $user_id = $eventPayload['user']['id'];
-
+else if ($type == 'view_submission') {
+    //todo make sure everything has block/action ids
     // get all input fields
-    $inputValues = array();
-    foreach ($eventPayload['view']['blocks'] as $block) {
-        if (isset($block['element'])) {
-            $block_id = $block['block_id'];
-            $action_id = $block['element']['action_id'];
+    $inputValues = $slack->getInputValues($eventPayload['view']['state']['values']);
 
-            $value = $eventPayload
-                ['view']
-                ['state']
-                ['values']
-                [$block_id]
-                [$action_id];
-
-            $value = isset($value['selected_option']) ? $value['selected_option']['value'] : $value['value'];
-
-            $inputValues[$block['block_id']] = $value;
+    if ($callback_id == 'send-email-modal') {
+        $slack->sendEmail($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id']);
+    }
+    else if ($callback_id == 'submit-time-modal') {
+        // if hours are not valid, throw error
+        if (!is_numeric($inputValues['hours_qty']) || !(fmod($inputValues['hours_qty'], 0.25) == 0)) {
+            echo json_encode(array(
+                'response_action' => 'errors',
+                'errors' => array(
+                    'hours_qty' => 'Please enter your hours in increments of 0.25'
+                )
+            ));
         }
-    }
 
-    if ($eventPayload['view']['callback_id'] == 'email_modal') {
-        $slack->sendEmail($inputValues['house_id'], $inputValues['subject'], $inputValues['body']);
+        // todo submit work credit to db
     }
-    // todo add callback ids
-    else {    
+    else if ($callback_id == 'edit-profile-modal') { 
         // get user info from slack
         $slackUserInfo = json_decode($slack->apiCall('users.profile.get',
             array('user' => $user_id)
@@ -210,7 +187,7 @@ else if ($eventPayload['type'] == 'view_submission') {
         $slack->apiCall(
             'users.profile.set',
             array(
-                'user' => $eventPayload['user']['id'],
+                'user' => $user_id,
                 'profile' => array(
                     'fields' => array(
                         // pronouns

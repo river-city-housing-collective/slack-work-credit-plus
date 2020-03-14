@@ -1,0 +1,178 @@
+{
+    "type": "modal",
+    "callback_id": "submit-time-modal",
+	"title": {
+		"type": "plain_text",
+		"text": "Log Work Credit Hours",
+		"emoji": true
+	},
+	"submit": {
+		"type": "plain_text",
+		"text": "Submit",
+		"emoji": true
+	},
+	"close": {
+		"type": "plain_text",
+		"text": "Cancel",
+		"emoji": true
+	},
+	"blocks": [
+		{
+			"type": "section",
+			"block_id": "hours_type",
+			"text": {
+				"type": "mrkdwn",
+				"text": "*Type of Hours*"
+			},
+			"accessory": {
+				"type": "radio_buttons",
+				"initial_option": {
+					"text": {
+						"type": "plain_text",
+						"text": ":house: House",
+						"emoji": true
+					},
+					"value": "1",
+					"description": {
+						"type": "plain_text",
+						"text": "e.g. cooking, cleaning"
+					}
+				},
+				"options": [
+					{
+						"text": {
+							"type": "plain_text",
+							"text": ":house: House",
+							"emoji": true
+						},
+						"value": "1",
+						"description": {
+							"type": "plain_text",
+							"text": "e.g. cooking, cleaning"
+						}
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": ":sparkles: Collective",
+							"emoji": true
+						},
+						"value": "2",
+						"description": {
+							"type": "plain_text",
+							"text": "e.g. committee meetings, community outreach"
+						}
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": ":hammer_and_wrench: Maintenance",
+							"emoji": true
+						},
+						"value": "3",
+						"description": {
+							"type": "plain_text",
+							"text": "e.g. repairs, snow removal"
+						}
+					}
+				],
+				"action_id": "value"
+			}
+		},
+		{
+			"type": "input",
+			"block_id": "hours_qty",
+			"element": {
+				"type": "plain_text_input",
+				"placeholder": {
+					"type": "plain_text",
+					"text": "e.g. 1.25",
+					"emoji": true
+				},
+				"action_id": "value"
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Hours Completed",
+				"emoji": true
+			}
+		},
+		{
+			"type": "input",
+			"block_id": "date",
+			"element": {
+				"type": "datepicker",
+				"placeholder": {
+					"type": "plain_text",
+					"text": "Select a date",
+					"emoji": true
+				},
+				"action_id": "value"
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Date of Contribution",
+				"emoji": true
+			}
+		},
+		{
+			"type": "input",
+			"block_id": "description",
+			"element": {
+				"type": "plain_text_input",
+				"multiline": true,
+				"action_id": "value"
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Description of Work Completed",
+				"emoji": true
+			}
+		},
+		{
+			"type": "input",
+			"block_id": "special_req",
+			"optional": true,
+			"element": {
+				"type": "static_select",
+				"placeholder": {
+					"type": "plain_text",
+					"text": "Select",
+					"emoji": true
+				},
+				"options": [
+					{
+						"text": {
+							"type": "plain_text",
+							"text": ":female-cook: Cooked Dinner",
+							"emoji": true
+						},
+						"value": "1"
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": ":house: Attended House Meeting",
+							"emoji": true
+						},
+						"value": "2"
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": ":house_buildings: Attended BOD Meeting",
+							"emoji": true
+						},
+						"value": "3"
+					}
+				],
+				"action_id": "value"
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Does this fulfill an additonal monthly requirement?",
+				"emoji": true
+			}
+		}
+	]
+}

@@ -1,5 +1,6 @@
 {
 	"type": "home",
+	"callback_id": "app-home",
 	"blocks": [
 		{
 			"type": "image",
@@ -8,7 +9,7 @@
 				"text": "Hi! What can I help you with today?",
 				"emoji": true
 			},
-			"image_url": "https://cnet1.cbsistatic.com/img/qyvVFsmGS_gKN54BWgUcAME-K0g=/1092x0/2019/11/19/2eddb56d-56a3-4569-874e-32cd61180d6a/babyyoda2.jpg",
+			"image_url": "https://rchc.coop/assets/baby_yoda.png",
 			"alt_text": "Baby Yoda"
 		},
 		{
@@ -34,7 +35,7 @@
 					"text": "Submit Time",
 					"emoji": true
 				},
-				"value": "submit_time"
+				"value": "submit-time-modal"
 			}
 		},
 		{
@@ -60,7 +61,7 @@
 					"text": "Email",
 					"emoji": true
 				},
-				"value": "send_email"
+				"value": "send-email-modal"
 			}
 		},
 		{
@@ -86,7 +87,7 @@
 					"text": "Update",
 					"emoji": true
 				},
-				"value": "edit_profile"
+				"value": "edit-profile-modal"
 			}
 		}
 	]

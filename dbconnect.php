@@ -8,7 +8,7 @@ function db_connect() {
     if(!isset($connection)) {
              // Load configuration as an array. Use the actual location of your configuration file
         $config = parse_ini_file(
-            $_SERVER["REMOTE_ADDR"] == '127.0.0.1' ?
+            $_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1' ?
             'config.ini' :
             '/home/isaneu/private/config.ini'
         ); 

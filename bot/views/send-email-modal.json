@@ -1,9 +1,9 @@
 {
 	"type": "modal",
-	"callback_id": "email_modal",
+	"callback_id": "send-email-modal",
 	"title": {
 		"type": "plain_text",
-		"text": "Email Community",
+		"text": "Send Email",
 		"emoji": true
 	},
 	"submit": {
