@@ -1,5 +1,18 @@
 <?php
 
+function debug($value, $compact = null) {
+    if (is_array($value)) {
+        if ($compact) {
+            $value = json_encode($value);
+        }
+        else {
+            $value = json_encode($value, JSON_PRETTY_PRINT);
+        }
+    }
+
+    echo "\r\n" . '~START~ ' . "\r\n" . $value . "\r\n" . ' ~END~' . "\r\n";
+}
+
 function getSlackConfig($conn) {
     // get config from db
     $sql = "SELECT * FROM sl_config";
@@ -46,6 +59,31 @@ class Slack {
     public $authed;
     public $admin;
 
+    public $dbFields = array(
+        'sl_users' => array(
+            'slack_user_id' => 's',
+            'real_name' => 's',
+            'display_name' => 's',
+            'email' => 's',
+            'phone' => 's',
+            'house_id' => 's',
+            'room_id' => 'i',
+            'committee_id' => 's',
+            'is_boarder' => 'i',
+            'is_guest' => 'i',
+            'is_admin' => 'i',
+            'deleted' => 'i'
+        ),
+        'wc_time_records' => array(
+            'slack_user_id' => 's',
+            'hours_completed' => 'i',
+            'hour_type_id' => 'i',
+            'contribution_date' => 's',
+            'description' => 's',
+            'requirement_id' => 'i'
+        )
+    );
+
     public function __construct($conn, $type = 'bot', $config = null) {
         $this->conn = $conn;
 
@@ -56,25 +94,25 @@ class Slack {
         else {
             $this->config = $config;
 
-            $identityCheck = json_decode($this->apiCall('users.identity', array(), 'user'), true);
+            $identityCheck = $this->apiCall('users.identity', array(), 'user');
 
             $this->userInfo = $identityCheck['user'];
             $this->authed = $identityCheck['ok'];
         }
 
         if ($this->authed) {
-            $this->userGroups = json_decode($this->apiCall('usergroups.list'), true);
+            $this->userGroups = $this->apiCall('usergroups.list');
 
             // save user id for future calls
             $this->userId = $this->userInfo['id'];
 
             // get specifics about logged in user
-            $slackUserInfo = json_decode($this->apiCall(
+            $slackUserInfo = $this->apiCall(
                 'users.info',
                 'user=' . $this->userId,
                 'read',
                 true
-            ), true)['user'];
+            )['user'];
             
             $this->admin = $slackUserInfo['is_admin'];
             $slackUserInfo = $slackUserInfo['profile'];
@@ -93,7 +131,6 @@ class Slack {
         }
     }
 
-    // todo clean up - add option to return json or not
     public function apiCall($method, $params = array(), $type = 'read', $urlencoded = null) {
         if ($type == 'user') {
             $token = $this->config['user_token'];
@@ -117,7 +154,7 @@ class Slack {
 
         curl_setopt_array($curl, array(
             CURLOPT_URL => "https://slack.com/api/" . $method,
-            CURLOPT_POSTFIELDS => $urlencoded ? $params : json_encode($params), // todo auto format array into urlencoded
+            CURLOPT_POSTFIELDS => $urlencoded ? $params : json_encode($params),
             CURLOPT_HTTPHEADER => array(
                 "Content-Type: application/" . ($urlencoded ? "x-www-form-urlencoded" : "json"),
                 "Authorization: Bearer " . $token
@@ -134,17 +171,116 @@ class Slack {
         $response = curl_exec($curl);
 
         curl_close($curl);
-        return $response;
+        return json_decode($response, true);
+    }
+
+    public function sqlSelect($sql) {
+        $result = $this->conn->query($sql);
+
+        if (!$result->num_rows) {
+            return false;
+        }
+
+        $columns = array();
+        $returnResult = array();
+
+        while ($row = $result->fetch_assoc()) {
+            if (!$columns) {
+                $columns = array_keys($row);
+            }
+
+            // if there's only one column, return as string
+            if (sizeOf($columns) == 1) {
+                $rowData = $row[$columns[0]];
+            }
+            else {
+                // add assoc to array
+                foreach ($columns as $column) {
+                    $rowData[$column] = $row[$column];
+                }
+            }
+
+            $returnResult[] = $rowData;
+        };
+
+        // if key value pairs, simplify
+        if ($columns[0] == 'key' && $columns[1] == 'value') {
+            $newReturnResult = array();
+
+            foreach ($returnResult as $row) {
+                $key = $row['key'];
+                $value = $row['value'];
+
+                $newReturnResult[$key] = $value;
+            }
+
+            $returnResult = $newReturnResult;
+        }
+        // if there's only one row, simplify
+        else if (sizeOf($returnResult) == 1) {
+            $returnResult = $returnResult[0];
+        }
+
+        return $returnResult;
+    }
+
+    public function sqlInsert($table, $data) {
+        $dbFields = $this->dbFields[$table];
+        $fieldKeys = array_keys($dbFields);
+
+        $fields = array();
+        $values = array();
+        $preparedValues = array();
+        $updates = array();
+        $params = '';
+
+        foreach ($data as $key => $value) {
+            if (in_array($key, $fieldKeys)) {
+                $fields[] = $key;
+                $values[] = $value;
+                $params .= $dbFields[$key];
+            }
+        }
+        
+        foreach ($fields as $field) {
+            if ($field != 'slack_user_id') {
+                $updates[] = $field . ' = values(' . $field . ')';
+            }
+        }
+
+        for ($i=0; $i < sizeOf($fields); $i++){
+            $preparedValues[] = '?';
+        }
+
+        $fields = implode(', ', $fields);
+        $preparedValues = implode(', ', $preparedValues);
+        $updates = implode(', ', $updates);
+
+        // save updated profile info to db
+        $sql = "
+            insert into $table ($fields)
+                values ($preparedValues)
+            on duplicate key update
+                $updates
+        ";
+
+        // debug($sql);
+        // debug($params);
+        // debug($values);
+        
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param($params, ...$values);
+        $stmt->execute();
     }
 
     public function addToUsergroup($user_id, $usergroup_id) {
         // get current list of users
-        $users = json_decode($this->apiCall(
+        $users = $this->apiCall(
             'usergroups.users.list',
             'usergroup=' . $usergroup_id,
             'read',
             true
-        ), true)['users'];
+        )['users'];
 
         // add new user
         array_push($users, $user_id);
@@ -161,48 +297,45 @@ class Slack {
     }
 
     public function importSlackUsersToDb() {
-        $users = json_decode($this->apiCall(
-            'users.list'
-        ), true)['members'];
+        $users = $this->apiCall('users.list')['members'];
 
         $sql = 'insert into sl_users (
             slack_user_id,
-            slack_username,
-            first_name,
-            last_name,
             real_name,
+            display_name,
+            email,
+            phone,
             is_admin,
-            deleted,
-            email
+            deleted
         ) values ';
         $values = array();
+
+        // todo figure out how to get pronouns and committees
 
         foreach ($users as $user) {
             if (!$user['is_bot'] && $user['id'] != 'USLACKBOT') {
                 $values[] = "('" .
                     $user['id'] . "', '" .
-                    $user['name'] . "', '" .
-                    $user['profile']['first_name'] . "', '" .
-                    $user['profile']['last_name'] . "', '" .
-                    $user['profile']['real_name'] . "', " .
+                    $user['profile']['real_name'] . "', '" .
+                    $user['profile']['display_name'] . "', '" .
+                    $user['profile']['email'] . "', '" .
+                    $user['profile']['phone'] . "', " .
                     ($user['is_admin'] ? 'true' : 'false') . ", " .
-                    ($user['deleted'] ? 'true' : 'false') . ", '" .
-                    $user['profile']['email'] . "')";
+                    ($user['deleted'] ? 'true' : 'false') . ")";
             }
         }
 
         $sql .= implode(',', $values);
         $sql .= ' on duplicate key update
         slack_user_id = values(slack_user_id),
-        slack_username = values(slack_username),
-        first_name = values(first_name),
-        last_name = values(last_name),
         real_name = values(real_name),
+        display_name = values(display_name),
+        email = values(email),
+        phone = values(phone),
         is_admin = values(is_admin),
-        deleted = values(deleted),
-        email = values(email)';
+        deleted = values(deleted)';
 
-        echo $this->conn->query($sql);
+        $this->conn->query($sql);
     }
 
     public function sendEmail($fromUserId, $subject, $body, $house_id = null, $reallySend = false) {
@@ -276,28 +409,84 @@ class Slack {
         mail($toEmails, $subject, $body, $headers);
     }
 
-    public function openModal($trigger_id, $view, $params = null) {
-        $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
-
-        if ($view == 'send-email-modal' && isset($params['body'])) {
-            // todo auto address based on channel origin
-            // $channel_id = $params['channel_id'];
-            // $result = $this->conn->query("select slack_usergroup_id from sl_houses where slack_channel_id = $channel_id");
-            // $house_id = $result->fetch_assoc()['id'];
-
-            $viewJson['blocks'][2]['element']['initial_value'] = $params['body'];
-        }
-
+    public function openView($trigger_id, $viewJson, $view_id = null) {
         $json = array(
             'trigger_id' => $trigger_id,
             'view' => $viewJson
         );
 
-        echo $this->apiCall(
-            'views.open',
+        if ($view_id) {
+            $json['view_id'] = $view_id;
+        }
+
+        echo json_encode($this->apiCall(
+            $view_id ? 'views.update' : 'views.open',
             $json,
             'bot'
-        );
+        ));
+    }
+
+    public function buildProfileModal($profileData) {
+        $viewJson = json_decode(file_get_contents('views/edit-profile-modal.json'), TRUE);
+
+        if ($profileData['is_guest'] == '0') {
+            $additionalBlocks = json_decode(file_get_contents('views/profile-member-details.json'), TRUE);
+
+            // get houses
+            $additionalBlocks[sizeOf($additionalBlocks) - 1]['accessory']['options'] = $this->getOptions('sl_houses');;
+
+            if ($profileData['is_boarder'] == '0') {
+                $residentBlocks = json_decode(file_get_contents('views/profile-resident-details.json'), TRUE);
+
+                // get rooms and committees
+                $residentBlocks[0]['accessory']['options'] = $this->getOptions('sl_rooms', $profileData['house_id']);
+                $residentBlocks[1]['accessory']['options'] = $this->getOptions('sl_committees', $profileData['is_admin']);
+
+                $additionalBlocks = array_merge($additionalBlocks, $residentBlocks);
+            }
+
+            $viewJson['blocks'] = array_merge($viewJson['blocks'], $additionalBlocks);
+        }
+
+        $viewJson = $this->setInputValues($viewJson, $profileData);
+
+        return $viewJson;
+    }
+
+    public function getOptions($table, $filter = null) {
+        if ($table == 'sl_houses' || $table == 'sl_committees') {
+            $key = 'name';
+            $value = 'slack_group_id';
+
+            $sql = "select * from $table";
+
+            if ($table == 'sl_committees' && $filter) {
+                $sql .= " where name <> 'Board Officers'";
+            }
+        }
+        else if ($table == 'sl_rooms') {
+            $key = 'room';
+            $value = 'id';
+
+            $sql = "select id, room from sl_rooms";
+
+            if ($filter) {
+                $sql .= " where house_id = '$filter'";
+            }
+        }
+
+        $result = $this->conn->query($sql);
+        while ($row = $result->fetch_assoc()) {
+            $options[] = array(
+                'text' => array(
+                    'type' => 'plain_text',
+                    'text' => $row[$key]
+                ),
+                'value' => $row[$value]
+            );
+        }
+
+        return $options;
     }
 
     public function getInputValues($valuesObj) {
@@ -309,7 +498,12 @@ class Slack {
                 $value = $data['selected_date'];
             }
             else if ($type == 'static_select') {
-                $value = $data['selected_option']['value'];
+                if (isset($data['selected_option'])) {
+                    $value = $data['selected_option']['value'];
+                }
+                else {
+                    continue;
+                }
             }
             else {
                 $value = $data['value'];
@@ -319,5 +513,120 @@ class Slack {
         }
 
         return $inputValues;
+    }
+
+    public function setInputValues($viewJson, $values) {
+        foreach ($values as $key => $value) {
+            if (isset($value)) {
+                $values[$key] = $value;
+
+                $keys[] = $key;
+            }
+        }
+
+        foreach ($viewJson['blocks'] as $index => $block) {
+            if (isset($block['block_id'])) {
+                // if data exists for this block
+                if (in_array($block['block_id'], $keys)) {
+                    $value = $values[$block['block_id']];
+
+                    if (isset($block['accessory'])) {
+                        if ($block['accessory']['type'] == 'static_select') {
+                            if (isset($value)) {
+                                foreach ($block['accessory']['options'] as $option) {
+                                    $optionLookup[$option['value']] = $option;
+                                }
+            
+                                $viewJson
+                                    ['blocks']
+                                    [$index]
+                                    ['accessory']
+                                    ['initial_option'] = $optionLookup[$value];
+                            }
+                        }
+                    }
+                    else {
+                        $viewJson
+                            ['blocks']
+                            [$index]
+                            ['element']
+                            ['initial_value'] = $value;
+                    }
+                }
+            }
+        }
+
+        return $viewJson;
+    }
+
+    public function updateUserProfile($user_id, $inputValues = 'null') {
+        if ($inputValues) {
+            $result = $this->apiCall(
+                'users.profile.set',
+                array(
+                    'user' => $user_id,
+                    'profile' => array(
+                        'real_name' => $inputValues['real_name'],
+                        'display_name' => $inputValues['display_name'],
+                        'phone' => $inputValues['phone'],
+                        'fields' => array(
+                            $this->config['PRONOUNS_FIELD_ID'] => array(
+                                'value' => $inputValues['pronouns']
+                            )
+                        )
+                    ),
+                'write'
+                )
+            );
+
+            // if errors saving profile
+            if (!$result['ok']) {
+                if ($result['error'] == 'invalid_name_specials') {
+                    echo json_encode(array(
+                        'response_action' => 'errors',
+                        'errors' => array(
+                            $result['field'] => 'Mostly, names can’t contain punctuation. (Apostrophes, spaces, and periods are fine.)'
+                        )
+                    ));
+
+                    die();
+                }
+            }
+        }
+        else {
+            $inputValues = $this->apiCall(
+                'users.profile.get',
+                array('user' => $user_id)
+            );
+        }
+
+        // if changing to boarder status, wipe out room and committee
+        if (isset($inputValues['is_boarder'])) {
+            if ($inputValues['is_boarder'] == '1') {
+                $inputValues['room_id'] = null;
+                $inputValues['committee_id'] = null;
+            }
+        }
+
+        debug($inputValues);
+
+        $inputValues['slack_user_id'] = $user_id;
+
+        $this->sqlInsert('sl_users', $inputValues);
+    }
+
+    public function getStoredViewData($user_id, $view_id) {
+        $sql = "
+            select vs.`key`, vs.`value`
+            from sl_view_states as vs
+            inner join (
+                select `key`, max(timestamp) as ts
+                from sl_view_states
+                group by `key`
+            ) as maxt on (vs.`key` = maxt.`key` and vs.timestamp = maxt.ts)
+            where slack_user_id = '$user_id' and slack_view_id = '$view_id'
+        ";
+
+        return $this->sqlSelect($sql);
     }
 }

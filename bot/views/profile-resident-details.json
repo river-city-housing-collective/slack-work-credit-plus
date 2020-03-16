@@ -1,0 +1,45 @@
+[
+    {
+        "type": "section",
+        "block_id": "room_id",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":door: My room number is..."
+        },
+        "accessory": {
+            "type": "static_select",
+            "action_id": "value",
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Select",
+                "emoji": true
+            }
+        }
+    },
+    {
+        "type": "section",
+        "block_id": "committee_id",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":sparkles: My committee is..."
+        },
+        "accessory": {
+            "type": "static_select",
+            "action_id": "value",
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Select",
+                "emoji": true
+            }
+        }
+    },
+    {
+        "type": "context",
+        "elements": [
+            {
+                "type": "mrkdwn",
+                "text": "You will be automatically added to the appropriate house/committee channels/groups. This information is also referenced by the Work Credit Report so please keep it up to date! :heart:"
+            }
+        ]
+    }
+]

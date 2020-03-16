@@ -35,3 +35,6 @@ if ($type == 'app_home_opened') {
         'bot'
     );
 }
+else if ($type = 'user_change') {
+    $slack->saveSlackUserToDb($user_id);
+}

@@ -22,6 +22,7 @@
 			"type": "input",
 			"element": {
 				"type": "static_select",
+				"action_id": "value",
 				"placeholder": {
 					"type": "plain_text",
 					"text": "Select",
@@ -72,7 +73,8 @@
 			"block_id": "subject",
 			"type": "input",
 			"element": {
-				"type": "plain_text_input"
+				"type": "plain_text_input",
+				"action_id": "value"
 			},
 			"label": {
 				"type": "plain_text",
@@ -85,7 +87,8 @@
 			"type": "input",
 			"element": {
 				"type": "plain_text_input",
-				"multiline": true
+				"multiline": true,
+				"action_id": "value"
 			},
 			"label": {
 				"type": "plain_text",

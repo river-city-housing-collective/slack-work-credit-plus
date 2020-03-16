@@ -1,5 +1,6 @@
 {
 	"type": "modal",
+	"callback_id": "edit-profile-modal",
 	"title": {
 		"type": "plain_text",
 		"text": "Edit Profile",
@@ -7,145 +8,79 @@
 	},
 	"submit": {
 		"type": "plain_text",
-		"text": "Submit",
+		"text": "Save",
 		"emoji": true
 	},
 	"blocks": [
 		{
-			"type": "section",
-			"text": {
-				"type": "mrkdwn",
-				"text": " "
-			},
-			"accessory": {
-				"type": "radio_buttons",
-				"initial_option": {
-					"text": {
-						"type": "plain_text",
-						"text": "Resident"
-					},
-					"value": "resident"
-				},
-				"options": [
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Resident"
-						},
-						"value": "resident"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Boarder"
-						},
-						"value": "boarder"
-					}
-				]
-			}
-		},
-		{
-			"type": "divider"
-		},
-		{
 			"type": "input",
+			"block_id": "real_name",
 			"element": {
-				"action_id": "house_lookup",
-				"type": "external_select",
+				"type": "plain_text_input",
+				"action_id": "value",
 				"placeholder": {
 					"type": "plain_text",
-					"text": "Select",
+					"text": " ",
 					"emoji": true
 				}
 			},
 			"label": {
 				"type": "plain_text",
-				"text": ":house: House",
+				"text": "Full Name",
 				"emoji": true
 			}
 		},
 		{
+			"type": "context",
+			"elements": [
+				{
+					"type": "mrkdwn",
+					"text": "This will be displayed in your Slack profile and on the Work Credit Report."
+				}
+			]
+		},
+		{
 			"type": "input",
+			"block_id": "display_name",
 			"element": {
-				"type": "external_select",
+				"type": "plain_text_input",
+				"action_id": "value",
 				"placeholder": {
 					"type": "plain_text",
-					"text": "Select",
+					"text": " ",
 					"emoji": true
 				}
 			},
 			"label": {
 				"type": "plain_text",
-				"text": ":door: Room Number",
+				"text": "Display Name",
 				"emoji": true
 			}
 		},
 		{
-			"type": "divider"
+			"type": "context",
+			"elements": [
+				{
+					"type": "mrkdwn",
+					"text": "Members will be able to use this name to message and mention you in Slack."
+				}
+			]
 		},
 		{
+			"block_id": "phone",
 			"type": "input",
 			"element": {
-				"type": "static_select",
+				"type": "plain_text_input",
+				"action_id": "value",
 				"placeholder": {
 					"type": "plain_text",
-					"text": "Select",
+					"text": " ",
 					"emoji": true
-				},
-				"options": [
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Maintenance",
-							"emoji": true
-						},
-						"value": "6"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Finance & Development",
-							"emoji": true
-						},
-						"value": "4"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Education & Culture",
-							"emoji": true
-						},
-						"value": "2"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Membership",
-							"emoji": true
-						},
-						"value": "5"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Resource Officers",
-							"emoji": true
-						},
-						"value": "3"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "None (I'm a boarder!)",
-							"emoji": true
-						},
-						"value": "0"
-					}
-				]
+				}
 			},
 			"label": {
 				"type": "plain_text",
-				"text": "Committee",
+				"text": "Phone Number",
 				"emoji": true
 			}
 		},
@@ -153,72 +88,28 @@
 			"block_id": "pronouns",
 			"type": "input",
 			"element": {
-				"type": "plain_text_input"
+				"type": "plain_text_input",
+				"action_id": "value",
+				"placeholder": {
+					"type": "plain_text",
+					"text": "she/her, he/him, they/them, etc",
+					"emoji": true
+				}
 			},
 			"label": {
 				"type": "plain_text",
-				"text": "What are your preferred pronouns?",
+				"text": "Pronouns",
 				"emoji": true
 			}
 		},
 		{
-			"type": "divider"
-		},
-		{
-			"type": "section",
-			"text": {
-				"type": "mrkdwn",
-				"text": "This is a section block with radio button accessory"
-			},
-			"accessory": {
-				"type": "radio_buttons",
-				"initial_option": {
-					"text": {
-						"type": "plain_text",
-						"text": "Option 1"
-					},
-					"value": "option 1",
-					"description": {
-						"type": "plain_text",
-						"text": "Description for option 1"
-					}
-				},
-				"options": [
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Option 1"
-						},
-						"value": "option 1",
-						"description": {
-							"type": "plain_text",
-							"text": "Description for option 1"
-						}
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Option 2"
-						},
-						"value": "option 2",
-						"description": {
-							"type": "plain_text",
-							"text": "Description for option 2"
-						}
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Option 3"
-						},
-						"value": "option 3",
-						"description": {
-							"type": "plain_text",
-							"text": "Description for option 3"
-						}
-					}
-				]
-			}
+			"type": "context",
+			"elements": [
+				{
+					"type": "mrkdwn",
+					"text": "These will appear in your Slack profile so others may reference them."
+				}
+			]
 		}
 	]
 }

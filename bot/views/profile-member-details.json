@@ -1,0 +1,64 @@
+[
+    {
+        "type": "divider"
+    },
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "*Membership Details*"
+        }
+    },
+    {
+        "type": "section",
+        "block_id": "is_boarder",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":slightly_smiling_face: I am a..."
+        },
+        "accessory": {
+            "type": "static_select",
+            "action_id": "value",
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Select",
+                "emoji": true
+            },
+            "options": [
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Resident",
+                        "emoji": true
+                    },
+                    "value": "0"
+                },
+                {
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Boarder",
+                        "emoji": true
+                    },
+                    "value": "1"
+                }
+            ]
+        }
+    },
+    {
+        "type": "section",
+        "block_id": "house_id",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":house: My house is..."
+        },
+        "accessory": {
+            "type": "static_select",
+            "action_id": "value",
+            "placeholder": {
+                "type": "plain_text",
+                "text": "Select",
+                "emoji": true
+            }
+        }
+    }
+]

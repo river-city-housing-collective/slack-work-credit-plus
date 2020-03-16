@@ -19,13 +19,14 @@
 	"blocks": [
 		{
 			"type": "section",
-			"block_id": "hours_type",
+			"block_id": "hour_type_id",
 			"text": {
 				"type": "mrkdwn",
 				"text": "*Type of Hours*"
 			},
 			"accessory": {
 				"type": "radio_buttons",
+				"action_id": "value",
 				"initial_option": {
 					"text": {
 						"type": "plain_text",
@@ -75,13 +76,12 @@
 							"text": "e.g. repairs, snow removal"
 						}
 					}
-				],
-				"action_id": "value"
+				]
 			}
 		},
 		{
 			"type": "input",
-			"block_id": "hours_qty",
+			"block_id": "hours_completed",
 			"element": {
 				"type": "plain_text_input",
 				"placeholder": {
@@ -99,7 +99,7 @@
 		},
 		{
 			"type": "input",
-			"block_id": "date",
+			"block_id": "contribution_date",
 			"element": {
 				"type": "datepicker",
 				"placeholder": {
@@ -131,10 +131,11 @@
 		},
 		{
 			"type": "input",
-			"block_id": "special_req",
+			"block_id": "requirement_id",
 			"optional": true,
 			"element": {
 				"type": "static_select",
+				"action_id": "value",
 				"placeholder": {
 					"type": "plain_text",
 					"text": "Select",
@@ -165,8 +166,7 @@
 						},
 						"value": "3"
 					}
-				],
-				"action_id": "value"
+				]
 			},
 			"label": {
 				"type": "plain_text",
