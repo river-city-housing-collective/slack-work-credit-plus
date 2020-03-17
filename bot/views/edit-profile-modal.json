@@ -42,6 +42,7 @@
 		{
 			"type": "input",
 			"block_id": "display_name",
+			"optional": true,
 			"element": {
 				"type": "plain_text_input",
 				"action_id": "value",
@@ -67,24 +68,6 @@
 			]
 		},
 		{
-			"block_id": "phone",
-			"type": "input",
-			"element": {
-				"type": "plain_text_input",
-				"action_id": "value",
-				"placeholder": {
-					"type": "plain_text",
-					"text": " ",
-					"emoji": true
-				}
-			},
-			"label": {
-				"type": "plain_text",
-				"text": "Phone Number",
-				"emoji": true
-			}
-		},
-		{
 			"block_id": "pronouns",
 			"type": "input",
 			"element": {
@@ -107,9 +90,28 @@
 			"elements": [
 				{
 					"type": "mrkdwn",
-					"text": "These will appear in your Slack profile so others may reference them."
+					"text": "These will appear on your Slack profile so others may reference them."
 				}
 			]
+		},
+		{
+			"block_id": "phone",
+			"optional": true,
+			"type": "input",
+			"element": {
+				"type": "plain_text_input",
+				"action_id": "value",
+				"placeholder": {
+					"type": "plain_text",
+					"text": " ",
+					"emoji": true
+				}
+			},
+			"label": {
+				"type": "plain_text",
+				"text": "Phone Number",
+				"emoji": true
+			}
 		}
 	]
 }

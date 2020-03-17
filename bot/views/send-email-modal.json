@@ -36,32 +36,16 @@
 							"emoji": true
 						},
 						"value": "0"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Anomy",
-							"emoji": true
-						},
-						"value": "2"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": "Bloom",
-							"emoji": true
-						},
-						"value": "3"
-					},
-                    {
-						"text": {
-							"type": "plain_text",
-							"text": "Summit",
-							"emoji": true
-						},
-						"value": "1"
 					}
-				]
+				],
+				"initial_option": {
+					"text": {
+						"type": "plain_text",
+						"text": "All RCHC Members",
+						"emoji": true
+					},
+					"value": "0"
+				}
 			},
 			"label": {
 				"type": "plain_text",

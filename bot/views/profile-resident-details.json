@@ -1,19 +1,20 @@
 [
     {
         "type": "section",
-        "block_id": "room_id",
+        "block_id": "room_number",
         "text": {
             "type": "mrkdwn",
             "text": ":door: My room number is..."
         },
         "accessory": {
-            "type": "static_select",
+            "type": "button",
             "action_id": "value",
-            "placeholder": {
+            "text": {
                 "type": "plain_text",
                 "text": "Select",
                 "emoji": true
-            }
+            },
+            "value": "edit_room"
         }
     },
     {

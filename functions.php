@@ -81,6 +81,12 @@ class Slack {
             'contribution_date' => 's',
             'description' => 's',
             'requirement_id' => 'i'
+        ),
+        'sl_view_states' => array(
+            'slack_view_id' => 's',
+            'slack_user_id' => 's',
+            'sl_key' => 's',
+            'sl_value' => 's'
         )
     );
 
@@ -177,7 +183,7 @@ class Slack {
     public function sqlSelect($sql) {
         $result = $this->conn->query($sql);
 
-        if (!$result->num_rows) {
+        if ($result->num_rows == 0) {
             return false;
         }
 
@@ -204,12 +210,12 @@ class Slack {
         };
 
         // if key value pairs, simplify
-        if ($columns[0] == 'key' && $columns[1] == 'value') {
+        if ($columns[0] == 'sl_key' && $columns[1] == 'sl_value') {
             $newReturnResult = array();
 
             foreach ($returnResult as $row) {
-                $key = $row['key'];
-                $value = $row['value'];
+                $key = $row['sl_key'];
+                $value = $row['sl_value'];
 
                 $newReturnResult[$key] = $value;
             }
@@ -227,6 +233,7 @@ class Slack {
     public function sqlInsert($table, $data) {
         $dbFields = $this->dbFields[$table];
         $fieldKeys = array_keys($dbFields);
+        $primaryKey = ($table == 'sl_view_states' ? 'slack_view_id' : 'slack_user_id');
 
         $fields = array();
         $values = array();
@@ -243,7 +250,7 @@ class Slack {
         }
         
         foreach ($fields as $field) {
-            if ($field != 'slack_user_id') {
+            if ($field != $primaryKey) {
                 $updates[] = $field . ' = values(' . $field . ')';
             }
         }
@@ -409,38 +416,30 @@ class Slack {
         mail($toEmails, $subject, $body, $headers);
     }
 
-    public function openView($trigger_id, $viewJson, $view_id = null) {
-        $json = array(
-            'trigger_id' => $trigger_id,
-            'view' => $viewJson
-        );
-
-        if ($view_id) {
-            $json['view_id'] = $view_id;
-        }
-
-        echo json_encode($this->apiCall(
-            $view_id ? 'views.update' : 'views.open',
-            $json,
-            'bot'
-        ));
-    }
-
     public function buildProfileModal($profileData) {
         $viewJson = json_decode(file_get_contents('views/edit-profile-modal.json'), TRUE);
 
-        if ($profileData['is_guest'] == '0') {
+        $is_guest = isset($profileData['is_guest']) ? $profileData['is_guest'] : false;
+        $is_boarder = isset($profileData['is_boarder']) ? $profileData['is_boarder'] : false;
+        $is_admin = isset($profileData['is_admin']) ? $profileData['is_admin'] : false;
+
+        if (!$is_guest) {
             $additionalBlocks = json_decode(file_get_contents('views/profile-member-details.json'), TRUE);
 
             // get houses
-            $additionalBlocks[sizeOf($additionalBlocks) - 1]['accessory']['options'] = $this->getOptions('sl_houses');;
+            $additionalBlocks[sizeOf($additionalBlocks) - 1]['accessory']['options'] = $this->getOptions('sl_houses');
 
-            if ($profileData['is_boarder'] == '0') {
+            if (!$is_boarder) {
                 $residentBlocks = json_decode(file_get_contents('views/profile-resident-details.json'), TRUE);
 
-                // get rooms and committees
-                $residentBlocks[0]['accessory']['options'] = $this->getOptions('sl_rooms', $profileData['house_id']);
-                $residentBlocks[1]['accessory']['options'] = $this->getOptions('sl_committees', $profileData['is_admin']);
+                // display room_id (if exists) and get committees
+                if (isset($profileData['room_id'])) {
+                    $room_id = $profileData['room_id'];
+                    $house_id = $profileData['house_id'];
+
+                    $residentBlocks[0]['accessory']['text']['text'] = $this->sqlSelect("select room from sl_rooms where id = $room_id and house_id = '$house_id'");
+                }
+                $residentBlocks[1]['accessory']['options'] = $this->getOptions('sl_committees', $is_admin);
 
                 $additionalBlocks = array_merge($additionalBlocks, $residentBlocks);
             }
@@ -455,34 +454,55 @@ class Slack {
 
     public function getOptions($table, $filter = null) {
         if ($table == 'sl_houses' || $table == 'sl_committees') {
-            $key = 'name';
-            $value = 'slack_group_id';
+            $fieldKey = 'name';
+            $fieldValue = 'slack_group_id';
 
             $sql = "select * from $table";
 
-            if ($table == 'sl_committees' && $filter) {
+            if ($table == 'sl_committees' && !$filter) {
                 $sql .= " where name <> 'Board Officers'";
             }
+
+            $sql .= ' order by name asc';
         }
         else if ($table == 'sl_rooms') {
-            $key = 'room';
-            $value = 'id';
+            $fieldKey = 'room';
+            $fieldValue = 'id';
 
-            $sql = "select id, room from sl_rooms";
-
-            if ($filter) {
-                $sql .= " where house_id = '$filter'";
-            }
+            $sql = "
+                select
+                    r.id,
+                    r.room,
+                    group_concat(
+                        u.real_name
+                        order by real_name asc
+                        separator ', '
+                    ) as residents
+                from sl_rooms as r
+                left join sl_users as u
+                    on u.room_id = r.id
+                    and u.house_id = r.house_id
+                where r.house_id = '$filter'
+                group by r.room
+                order by id asc
+            ";
         }
 
         $result = $this->conn->query($sql);
         while ($row = $result->fetch_assoc()) {
+            $value = $row[$fieldValue];
+            $label = $row[$fieldKey];
+            
+            if (isset($row['residents'])) {
+                $label = $label . ' (' . $row['residents'] . ')';
+            }
+
             $options[] = array(
                 'text' => array(
                     'type' => 'plain_text',
-                    'text' => $row[$key]
+                    'text' => $label
                 ),
-                'value' => $row[$value]
+                'value' => $value
             );
         }
 
@@ -531,16 +551,25 @@ class Slack {
                     $value = $values[$block['block_id']];
 
                     if (isset($block['accessory'])) {
-                        if ($block['accessory']['type'] == 'static_select') {
+                        $type = 'accessory';
+                    }
+                    else if (isset($block['element'])) {
+                        if ($block['element']['type'] == 'static_select') {
+                            $type = 'element';
+                        }
+                    }
+
+                    if (isset($type)) {
+                        if ($block[$type]['type'] == 'static_select') {
                             if (isset($value)) {
-                                foreach ($block['accessory']['options'] as $option) {
+                                foreach ($block[$type]['options'] as $option) {
                                     $optionLookup[$option['value']] = $option;
                                 }
             
                                 $viewJson
                                     ['blocks']
                                     [$index]
-                                    ['accessory']
+                                    [$type]
                                     ['initial_option'] = $optionLookup[$value];
                             }
                         }
@@ -608,25 +637,31 @@ class Slack {
             }
         }
 
-        debug($inputValues);
-
         $inputValues['slack_user_id'] = $user_id;
 
         $this->sqlInsert('sl_users', $inputValues);
     }
 
-    public function getStoredViewData($user_id, $view_id) {
+    public function getStoredViewData($user_id, $view_id, $inputValues = null) {
         $sql = "
-            select vs.`key`, vs.`value`
+            select vs.sl_key, vs.sl_value
             from sl_view_states as vs
             inner join (
-                select `key`, max(timestamp) as ts
+                select sl_key, max(timestamp) as ts
                 from sl_view_states
-                group by `key`
-            ) as maxt on (vs.`key` = maxt.`key` and vs.timestamp = maxt.ts)
+                group by sl_key
+            ) as maxt on (vs.sl_key = maxt.sl_key and vs.timestamp = maxt.ts)
             where slack_user_id = '$user_id' and slack_view_id = '$view_id'
         ";
 
-        return $this->sqlSelect($sql);
+        $storedValues = $this->sqlSelect($sql);
+
+        if ($storedValues) {
+            foreach ($storedValues as $field => $value) {
+                $inputValues[$field] = $value;
+            }
+        }
+
+        return $inputValues;
     }
 }

@@ -1,0 +1,22 @@
+{
+	"type": "modal",
+	"title": {
+		"type": "plain_text",
+		"text": "Under Construction",
+		"emoji": true
+	},
+	"close": {
+		"type": "plain_text",
+		"text": "Close",
+		"emoji": true
+	},
+	"blocks": [
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": ":construction: Nothing to see here (yet)! :construction:"
+			}
+		}
+	]
+}

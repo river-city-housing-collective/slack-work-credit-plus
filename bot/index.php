@@ -35,6 +35,7 @@ if ($type == 'url_verification') {
 // get callback id if set
 if (isset($eventPayload['view'])) {
     $callback_id = $eventPayload['view']['callback_id'];
+    $view_id = $eventPayload['view']['id'];
 }
 else if (isset($eventPayload['callback_id'])) {
     $callback_id = $eventPayload['callback_id'];
@@ -47,14 +48,20 @@ else if (isset($eventPayload['callback_id'])) {
 if ($type == 'message_action') {
     if ($callback_id == 'email') {
         $viewJson = json_decode(file_get_contents('views/send-email-modal.json'), TRUE);
+        $viewJson['blocks'][0]['element']['options'] = array_merge($viewJson['blocks'][0]['element']['options'], $slack->getOptions('sl_houses'));
         $viewJson = $slack->setInputValues($viewJson, array('body' => $eventPayload['message']['text']));
 
-        $slack->openView($trigger_id, $viewJson);
+        echo json_encode($slack->apiCall(
+            'views.open',
+            array(
+                'view' => $viewJson,
+                'trigger_id' => $trigger_id
+            ),
+            'bot'
+        ));
     }
 }
 else if ($type == 'block_actions') {
-    $view_id = $eventPayload['view']['id'];
-
     if (isset($eventPayload['actions'])) {
         $actionData = $eventPayload['actions'][0];
 
@@ -71,21 +78,40 @@ else if ($type == 'block_actions') {
     if ($callback_id == 'app-home') {
         $view = $eventPayload['actions'][0]['value'];
 
+        // todo restricting WIP stuff to admins for now
+        if (!$profileData['is_admin'] && in_array($view, array('send-email-modal', 'submit-time-modal'))) {
+            $view = 'under-construction';
+        }
+
         if ($view == 'edit-profile-modal') {
             $viewJson = $slack->buildProfileModal($profileData);
-            $slack->openView($trigger_id, $viewJson);
         }
         else {
             $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
-            $slack->openView($trigger_id, $viewJson);
+
+            if ($view == 'send-email-modal') {
+                $viewJson['blocks'][0]['element']['options'] = array_merge($viewJson['blocks'][0]['element']['options'], $slack->getOptions('sl_houses'));
+            }
+        }
+
+        if (isset($viewJson)) {
+            echo json_encode($slack->apiCall(
+                'views.open',
+                array(
+                    'view' => $viewJson,
+                    'trigger_id' => $trigger_id
+                ),
+                'bot'
+            ));
         }
     }
     // updating edit profile view
     else if ($callback_id == 'edit-profile-modal') {
-        // get previously submitted field updates
-        $storedValues = $slack->getStoredViewData($user_id, $view_id);
 
         $lastHouseId = $profileData['house_id'];
+
+        // get previously submitted field updates
+        $storedValues = $slack->getStoredViewData($user_id, $view_id);
 
         if ($storedValues) {
             foreach ($storedValues as $field => $value) {
@@ -96,33 +122,84 @@ else if ($type == 'block_actions') {
         // get current field update
         $profileData[$actionKey] = $actionValue;
 
-        // wipe out room number if house changed
-        // if ($lastHouseId != $profileData['house_id']) {
-        //     unset($profileData['room_id']);
-        // }
+        if ($actionKey == 'room_number') {
+            foreach ($profileData as $key => $value) {
+                if ($key != 'slack_user_id' && $key != 'room_number') {
+                    $data = array(
+                        'slack_view_id' => $view_id,
+                        'slack_user_id' => $user_id,
+                        'sl_key' => $key,
+                        'sl_value' => $value
+                    );
 
-        $viewJson = $slack->buildProfileModal($profileData);
-        $slack->openView($trigger_id, $viewJson, $view_id);
+                    $slack->sqlInsert('sl_view_states', $data);
+                }
+            }
+
+            $viewJson = json_decode(file_get_contents('views/profile-room-popup.json'), TRUE);
+            $viewJson['blocks'][0]['element']['options'] = $slack->getOptions('sl_rooms', $profileData['house_id']);
+            $viewJson = $slack->setInputValues($viewJson, $profileData);
+
+            echo json_encode($slack->apiCall(
+                'views.push',
+                array(
+                    'view' => $viewJson,
+                    'trigger_id' => $trigger_id
+                ),
+                'bot'
+            ));
+        }
+        else if ($actionKey == 'is_boarder') {
+            if ($profileData['is_boarder'] = '1') {
+                $profileData['room_id'] = null;
+            }
+
+            $profileData['is_boarder'] = $actionValue;
+
+            $viewJson = $slack->buildProfileModal($profileData);
+
+            echo json_encode($slack->apiCall(
+                'views.update',
+                array(
+                    'view' => $viewJson,
+                    'view_id' => $view_id
+                ),
+                'bot'
+            ));
+        }
+        else if ($actionKey == 'house_id') {
+            // wipe out room number if house changed
+            if ($lastHouseId != $profileData['house_id']) {
+                $slack->conn->query("
+                    insert into sl_view_states (slack_user_id, slack_view_id, sl_key, sl_value)
+                        values ('$user_id', '$view_id', 'room_id', NULL)
+                ");
+
+                unset($profileData['room_id']);
+
+                $viewJson = $slack->buildProfileModal($profileData);
+
+                echo json_encode($slack->apiCall(
+                    'views.update',
+                    array(
+                        'view' => $viewJson,
+                        'view_id' => $view_id
+                    ),
+                    'bot'
+                ));
+            }
+        }
     }
 
     $slack->conn->query("
-        insert into sl_view_states (slack_user_id, slack_view_id, `key`, `value`)
+        insert into sl_view_states (slack_user_id, slack_view_id, sl_key, sl_value)
             values ('$user_id', '$view_id', '$actionKey', '$actionValue')
     ");
 }
 // on modal submit
 else if ($type == 'view_submission') {
-    $view_id = $eventPayload['view']['id'];
-
     // get all input fields
     $inputValues = $slack->getInputValues($eventPayload['view']['state']['values']);
-    $storedValues = $slack->getStoredViewData($user_id, $view_id);
-
-    if ($storedValues) {
-        foreach ($storedValues as $field => $value) {
-            $inputValues[$field] = $value;
-        }
-    }
 
     if ($callback_id == 'send-email-modal') {
         // todo add true flag to enable for production
@@ -147,7 +224,34 @@ else if ($type == 'view_submission') {
 
         $slack->sqlInsert('wc_time_records', $inputValues);
     }
+    // save room_id to views table and update profile modal
+    else if ($callback_id == 'profile-room-popup') {
+        $view_id = $eventPayload['view']['root_view_id'];
+        $room_id = $inputValues['room_id'];
+
+        $slack->conn->query("
+            insert into sl_view_states (slack_user_id, slack_view_id, sl_key, sl_value)
+                values ('$user_id', '$view_id', 'room_id', '$room_id')
+        ");
+
+        $inputValues = $slack->getStoredViewData($user_id, $view_id, $inputValues);
+        //todo ?
+        $inputValues['room_id'] = $room_id;
+
+        $viewJson = $slack->buildProfileModal($inputValues);
+
+        $slack->apiCall(
+            'views.update',
+            array(
+                'view' => $viewJson,
+                'view_id' => $view_id
+            ),
+            'bot'
+        );
+    }
+    // submit updated profile data
     else if ($callback_id == 'edit-profile-modal') {
+        $storedValues = $slack->getStoredViewData($user_id, $view_id, $inputValues);
 
         // attempt to update slack profile and db
         $slack->updateUserProfile($user_id, $inputValues);
