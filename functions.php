@@ -1,4 +1,5 @@
 <?php
+require_once('dbconnect.php');
 
 function debug($value, $compact = null) {
     if (is_array($value)) {
@@ -24,7 +25,15 @@ function getSlackConfig($conn) {
     return $config;
 }
 
-function signInWithSlack($conn) {
+function signInWithSlack($conn, $adminOnly = null) {
+    if (isset($_GET['logout'])) {
+        echo 'logged out?';
+        setcookie('token', false, time() - 3600, '/');
+    
+        var_dump($_COOKIE);
+        exit();
+    }
+
     // get config from db
     $config = getSlackConfig($conn);
 
@@ -41,15 +50,52 @@ function signInWithSlack($conn) {
             '&code=' . $_GET['code']
         ), true);
 
-        $config['user_token'] = $auth['access_token'];
-        setcookie('token', $config['user_token'], strtotime( '+30 days' ), '/');
+        // set cookie and refresh
+        setcookie('token', $auth['access_token'], strtotime( '+30 days' ), '/');
+
+        if (isset($_GET['state'])) {
+            $redirect = urldecode($_GET['state']);
+
+            header("Location: $redirect");
+            exit();
+        }
     }
-    // no access
+    else {
+        $redirect = urlencode($_SERVER['PHP_SELF']);
+
+        echo "
+            <a href='https://slack.com/oauth/authorize?scope=identity.basic,identity.email,identity.team,identity.avatar&client_id=787965675794.822220955957&state=$redirect'>
+                <img
+                    alt='Sign in with Slack' height='40' width='172'
+                    src='https://platform.slack-edge.com/img/sign_in_with_slack.png'
+                    srcset='https://platform.slack-edge.com/img/sign_in_with_slack.png 1x, https://platform.slack-edge.com/img/sign_in_with_slack@2x.png 2x'
+                />
+            </a>";
+        exit();
+    }
+
+    // create new slack object
+    if ($config['user_token']) {
+        $slack = new Slack($conn, $config);
+    }
     else {
         return false;
     }
+    
+    // if not authed, show sign in button
+    if (!$slack->authed) {
+        die('login failed');
+    }
 
-    return new Slack($conn, 'user', $config);
+    // if not admin, die
+    if ($adminOnly && !$slack->admin) {
+        die('you do not have permission to access this page');
+    }
+
+    // member info popup
+    include($_SERVER['DOCUMENT_ROOT'] . '/includes.php');
+
+    return $slack;
 }
 
 class Slack {
@@ -74,28 +120,45 @@ class Slack {
             'is_admin' => 'i',
             'deleted' => 'i'
         ),
-        'wc_time_records' => array(
-            'slack_user_id' => 's',
-            'hours_completed' => 'i',
-            'hour_type_id' => 'i',
-            'contribution_date' => 's',
-            'description' => 's',
-            'requirement_id' => 'i'
-        ),
         'sl_view_states' => array(
             'slack_view_id' => 's',
             'slack_user_id' => 's',
             'sl_key' => 's',
             'sl_value' => 's'
+        ),
+        'wc_time_credits' => array(
+            'slack_user_id' => 's',
+            'hours_credited' => 's',
+            'hour_type_id' => 'i',
+            'contribution_date' => 's',
+            'description' => 's',
+            'other_req_id' => 'i'
+        ),
+        'wc_time_debits' => array(
+            'date_effective' => 's',
+            'slack_user_id' => 's',
+            'hours_debited' => 's',
+            'hour_type_id' => 'i',
+            'description' => 's'
+        ),
+        'wc_user_reqs' => array(
+            'slack_user_id' => 's',
+            'required_qty' => 'i',
+            'hours_type_id' => 'i',
+            'other_type_id' => 'i'
         )
     );
 
-    public function __construct($conn, $type = 'bot', $config = null) {
+    public function __construct($conn, $config = null, $userToken = null) {
         $this->conn = $conn;
 
-        // if skipped sign in step, get config (bot)
-        if ($type == 'bot') {
+        // if skipped sign in step, get config
+        if (!$config) {
             $this->config = getSlackConfig($conn);
+
+            if (isset($userToken)) {
+                $this->config['user_token'] = $userToken;
+            }
         }
         else {
             $this->config = $config;
@@ -124,7 +187,7 @@ class Slack {
             $slackUserInfo = $slackUserInfo['profile'];
 
             $houseDetails = $this->conn->query("
-                select h.name, u.committee_id from sl_users as u left join sl_houses as h on u.house_id = h.id where u.slack_user_id = '$this->userId'
+                select h.name, u.committee_id from sl_users as u left join sl_houses as h on u.house_id = h.slack_group_id where u.slack_user_id = '$this->userId'
             ")->fetch_assoc();
 
             // pare down to the essentials
@@ -180,10 +243,10 @@ class Slack {
         return json_decode($response, true);
     }
 
-    public function sqlSelect($sql) {
+    public function sqlSelect($sql, $returnJson = null, $noSimplify = false) {
         $result = $this->conn->query($sql);
 
-        if ($result->num_rows == 0) {
+        if (!isset($result->num_rows) || $result->num_rows == 0) {
             return false;
         }
 
@@ -222,12 +285,12 @@ class Slack {
 
             $returnResult = $newReturnResult;
         }
-        // if there's only one row, simplify
-        else if (sizeOf($returnResult) == 1) {
+        // if there's only one row, simplify (or not)
+        else if (sizeOf($returnResult) == 1 && !$noSimplify) {
             $returnResult = $returnResult[0];
         }
 
-        return $returnResult;
+        return $returnJson ? json_encode($returnResult) : $returnResult;
     }
 
     public function sqlInsert($table, $data) {
@@ -263,7 +326,6 @@ class Slack {
         $preparedValues = implode(', ', $preparedValues);
         $updates = implode(', ', $updates);
 
-        // save updated profile info to db
         $sql = "
             insert into $table ($fields)
                 values ($preparedValues)
@@ -640,6 +702,26 @@ class Slack {
         $inputValues['slack_user_id'] = $user_id;
 
         $this->sqlInsert('sl_users', $inputValues);
+
+        if (!isset($inputValues['is_guest'])) {
+            $inputValues['is_guest'] = $this->sqlSelect("select is_guest from sl_users where slack_user_id = '$user_id'");
+        }
+
+        if ($inputValues['is_guest'] == '0') {
+            $workCreditCheck = $this->sqlSelect("
+                select * from wc_time_debits
+                where slack_user_id = '$user_id'
+                order by date_effective desc limit 1
+            ");
+
+            if (!$workCreditCheck) {
+                $hourTypes = $this->sqlSelect("select id from wc_lookup_hour_types");
+
+                foreach ($hourTypes as $id) {
+                    $this->scheduleHoursDebit($user_id, $id, true);
+                }
+            };
+        }
     }
 
     public function getStoredViewData($user_id, $view_id, $inputValues = null) {
@@ -663,5 +745,59 @@ class Slack {
         }
 
         return $inputValues;
+    }
+
+    // todo - for adding modifiers to requirments
+    public function modifyWorkCreditUserReqs($user_id, $data = null) {
+        $lookups = array(
+            'hours' => $this->sqlSelect("select id, default_qty from wc_lookup_hour_types"),
+            'other' => $this->sqlSelect("select id, default_qty from wc_lookup_other_req_types")
+        );
+
+        // no specifics - use defaults
+        if (!$data) {
+            foreach ($lookups as $type => $lookup) {
+                foreach ($lookup as $values) {
+                    $data[] = array(
+                        'slack_user_id' => $user_id,
+                        'required_qty' => $values['default_qty'],
+                        $type . '_type_id' => $values['id']
+                    );
+                }
+            }
+        }
+        // todo allow updating with param
+
+        // todo multi-insert
+        foreach ($data as $row) {
+            $this->sqlInsert('wc_user_reqs', $row);
+        }
+    }
+
+    public function scheduleHoursDebit($user_id, $typeId, $newMember = false) {
+        $defaultHours = $this->sqlSelect("select default_qty from wc_lookup_hour_types where id = $typeId");
+        $hoursMod = $this->sqlSelect("select default_qty from wc_user_req_modifiers where id = $typeId and slack_user_id = $user_id");
+        $hours = $defaultHours + $hoursMod;
+
+        if ($newMember && $typeId != 3) {
+            $hours = $hours / 2;
+        }
+
+        $interval = '+1 month';
+        $dateFormat = 'Y-m-01';
+
+        if ($typeId == 3) {
+            $interval = '+1 year';
+            $dateFormat = 'Y-01-01';
+        }
+        $date = strtotime($interval, strtotime(date("Y-m-d")));
+        $date = date($dateFormat, $date);
+
+        $this->sqlInsert('wc_time_debits', array(
+            'date_effective' => $date,
+            'slack_user_id' => $user_id,
+            'hours_debited' => $hours,
+            'hour_type_id' => $typeId
+        ));
     }
 }

@@ -8,11 +8,10 @@ if ($_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1') 
 
 header('Content-Type: application/json');
 
-require_once('../dbconnect.php');
 require_once('../functions.php');
 
 // create new slack object with bot token
-$slack = new Slack($conn, 'bot');
+$slack = new Slack($conn);
 
 // get incoming object to work with
 if (isset($_POST['payload'])) {
@@ -78,13 +77,26 @@ else if ($type == 'block_actions') {
     if ($callback_id == 'app-home') {
         $view = $eventPayload['actions'][0]['value'];
 
-        // todo restricting WIP stuff to admins for now
+        // todo restricting WIP stuff to admins for now (also hide stuff for guests)
         if (!$profileData['is_admin'] && in_array($view, array('send-email-modal', 'submit-time-modal'))) {
             $view = 'under-construction';
         }
 
         if ($view == 'edit-profile-modal') {
             $viewJson = $slack->buildProfileModal($profileData);
+        }
+        else if ($view == 'submit-time-modal') {
+            $workCreditCheck = $slack->sqlSelect("
+                select * from wc_time_debits
+                where slack_user_id = '$user_id'
+                order by date_effective desc limit 1
+            ");
+
+            if (!$workCreditCheck) {
+                $view = 'work-credit-warning';
+            }
+
+            $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
         }
         else {
             $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
@@ -207,11 +219,19 @@ else if ($type == 'view_submission') {
     }
     else if ($callback_id == 'submit-time-modal') {
         // if hours are not valid, throw error
-        if (!is_numeric($inputValues['hours_completed']) || !(fmod($inputValues['hours_completed'], 0.25) == 0)) {
+        if (!is_numeric($inputValues['hours_credited']) || !(fmod($inputValues['hours_credited'], 0.25) == 0)) {
             echo json_encode(array(
                 'response_action' => 'errors',
                 'errors' => array(
-                    'hours_completed' => 'Please enter your hours in increments of 0.25'
+                    'hours_credited' => 'Please enter your hours in increments of 0.25'
+                )
+            ));
+        }
+        else if (intval($inputValues['hours_credited']) >= 99) {
+            echo json_encode(array(
+                'response_action' => 'errors',
+                'errors' => array(
+                    'hours_credited' => 'Wow, that\'s a lot of hours! Did you misplace a decimal?'
                 )
             ));
         }
@@ -222,7 +242,7 @@ else if ($type == 'view_submission') {
             $inputValues['hour_type_id'] = '1';
         }
 
-        $slack->sqlInsert('wc_time_records', $inputValues);
+        $slack->sqlInsert('wc_time_credits', $inputValues);
     }
     // save room_id to views table and update profile modal
     else if ($callback_id == 'profile-room-popup') {
@@ -251,7 +271,7 @@ else if ($type == 'view_submission') {
     }
     // submit updated profile data
     else if ($callback_id == 'edit-profile-modal') {
-        $storedValues = $slack->getStoredViewData($user_id, $view_id, $inputValues);
+        $inputValues = $slack->getStoredViewData($user_id, $view_id, $inputValues);
 
         // attempt to update slack profile and db
         $slack->updateUserProfile($user_id, $inputValues);

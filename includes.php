@@ -8,7 +8,7 @@
 
 <script>
     // get entire slack object - DEBUG ONLY
-    let slack = <?= json_encode($slack); ?>
+    // let slack = <?= json_encode($slack); ?>
 
     let userInfo = <?= json_encode($slack->userInfo); ?>
 </script>

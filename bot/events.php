@@ -6,7 +6,7 @@ require_once('../dbconnect.php');
 require_once('../functions.php');
 
 // create new slack object with bot token
-$slack = new Slack($conn, 'bot');
+$slack = new Slack($conn);
 
 // get incoming object to work with
 $eventPayload = json_decode(file_get_contents("php://input"), TRUE);

@@ -81,7 +81,7 @@
 		},
 		{
 			"type": "input",
-			"block_id": "hours_completed",
+			"block_id": "hours_credited",
 			"element": {
 				"type": "plain_text_input",
 				"placeholder": {
@@ -131,7 +131,7 @@
 		},
 		{
 			"type": "input",
-			"block_id": "requirement_id",
+			"block_id": "other_req_id",
 			"optional": true,
 			"element": {
 				"type": "static_select",

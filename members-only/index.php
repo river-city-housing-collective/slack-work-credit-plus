@@ -1,13 +1,14 @@
 <?php
+require_once($_SERVER['DOCUMENT_ROOT'] . '/functions.php');
+
 // page is only accessible if authorized via slack
 // $slack is available for additional API calls
-require_once('../auth.php');
-include('../includes.php');
+$slack = signInWithSlack($conn);
 ?>
 
 <ul>
-    <li><a href="work-credit">Work Credit</a></li>
+    <li><a href="/members-only/work-credit-report">Work Credit</a></li>
     <? if ($slack->admin) {
-        echo '<li><a href="admin.php">Admin Tools</a></li>';
+        echo '<li><a href="/members-only/admin.php">Admin Tools</a></li>';
     } ?>
 </ul>
