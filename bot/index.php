@@ -70,6 +70,7 @@ else if ($type == 'block_actions') {
 
     $profileData = $slack->sqlSelect("select * from sl_users where slack_user_id = '$user_id'");
 
+    // todo make sure pronouns are working
     $profileData['pronouns'] = $slack->apiCall('users.profile.get', array('user' => $user_id))
         ['profile']['fields'][$slack->config['PRONOUNS_FIELD_ID']]['value'];
 
@@ -97,6 +98,12 @@ else if ($type == 'block_actions') {
             }
 
             $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
+
+            // todo hide/disable other hour types for boarders
+            if (!$profileData['is_boarder']) {
+                $otherReqsQuestion = json_decode(file_get_contents('views/time-resident-addon.json'), TRUE);
+                array_push($viewJson['blocks'], $otherReqsQuestion);
+            }
         }
         else {
             $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
@@ -106,6 +113,7 @@ else if ($type == 'block_actions') {
             }
         }
 
+        // open view
         if (isset($viewJson)) {
             echo json_encode($slack->apiCall(
                 'views.open',
@@ -237,6 +245,7 @@ else if ($type == 'view_submission') {
         }
 
         $inputValues['slack_user_id'] = $user_id;
+        $inputValues['submit_source'] = 1; // submitting from slack
 
         if (!isset($inputValues['hour_type_id'])) {
             $inputValues['hour_type_id'] = '1';
@@ -275,30 +284,19 @@ else if ($type == 'view_submission') {
 
         // attempt to update slack profile and db
         $slack->updateUserProfile($user_id, $inputValues);
-    
-        // get usergroup info from db
-        // $sql = "
-        //     select
-        //         u.house_id,
-        //         u.committee_id,
-        //         h.slack_group_id as 'slack_house_id',
-        //         c.slack_group_id as 'slack_committee_id',
-        //         c.name as 'committee_name'
-        //     from sl_users as u
-        //     left join sl_houses as h on h.`id` = u.`house_id`
-        //     left join sl_committees as c on c.`id` = u.`committee_id`
-        //     where u.slack_user_id = '$user_id'
-        // ";
-        // $result = $slack->conn->query($sql);
-        // $userDbInfo = $result->fetch_assoc();
 
-        // todo remove from old usergroups here?
-    
-        // add to house and committee groups
-        // $slack->addToUsergroup($user_id, $userDbInfo['slack_house_id']);
-        // if ($userDbInfo['committee_id']) {
-        //     $slack->addToUsergroup($user_id, $userDbInfo['slack_committee_id']);
-        // }
+        // update usergroup associations
+        // todo testing channel associations - prob works
+
+        if (isset($inputValues['house_id'])) {
+            $slack->removeFromUsergroups($user_id, $inputValues['house_id'], 'sl_houses');
+            $slack->addToUsergroup($user_id, $inputValues['house_id']);
+        }
+
+        if (isset($inputValues['committee_id'])) {
+            $slack->removeFromUsergroups($user_id, $inputValues['committee_id'], 'sl_committees');
+            $slack->addToUsergroup($user_id, $inputValues['committee_id']);
+        }
     }
 
     header("HTTP/1.1 204 NO CONTENT");

@@ -22,7 +22,7 @@
 			"block_id": "hour_type_id",
 			"text": {
 				"type": "mrkdwn",
-				"text": "*Type of Hours*"
+				"text": "*Type of Hours:*"
 			},
 			"accessory": {
 				"type": "radio_buttons",
@@ -86,14 +86,14 @@
 				"type": "plain_text_input",
 				"placeholder": {
 					"type": "plain_text",
-					"text": "e.g. 1.25",
+					"text": " ",
 					"emoji": true
 				},
 				"action_id": "value"
 			},
 			"label": {
 				"type": "plain_text",
-				"text": "Hours Completed",
+				"text": "Hours Completed:",
 				"emoji": true
 			}
 		},
@@ -104,14 +104,14 @@
 				"type": "datepicker",
 				"placeholder": {
 					"type": "plain_text",
-					"text": "Select a date",
+					"text": " ",
 					"emoji": true
 				},
 				"action_id": "value"
 			},
 			"label": {
 				"type": "plain_text",
-				"text": "Date of Contribution",
+				"text": "Date of Contribution:",
 				"emoji": true
 			}
 		},
@@ -121,56 +121,16 @@
 			"element": {
 				"type": "plain_text_input",
 				"multiline": true,
-				"action_id": "value"
-			},
-			"label": {
-				"type": "plain_text",
-				"text": "Description of Work Completed",
-				"emoji": true
-			}
-		},
-		{
-			"type": "input",
-			"block_id": "other_req_id",
-			"optional": true,
-			"element": {
-				"type": "static_select",
 				"action_id": "value",
 				"placeholder": {
 					"type": "plain_text",
-					"text": "Select",
+					"text": " ",
 					"emoji": true
-				},
-				"options": [
-					{
-						"text": {
-							"type": "plain_text",
-							"text": ":female-cook: Cooked Dinner",
-							"emoji": true
-						},
-						"value": "1"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": ":house: Attended House Meeting",
-							"emoji": true
-						},
-						"value": "2"
-					},
-					{
-						"text": {
-							"type": "plain_text",
-							"text": ":house_buildings: Attended BOD Meeting",
-							"emoji": true
-						},
-						"value": "3"
-					}
-				]
+				}
 			},
 			"label": {
 				"type": "plain_text",
-				"text": "Does this fulfill an additonal monthly requirement?",
+				"text": "Description of Work Completed:",
 				"emoji": true
 			}
 		}

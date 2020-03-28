@@ -1,8 +1,12 @@
-#loggedInDisplay {
-    position:absolute;
-    top: 1vw;
-    right: 1vw;
-    display:inline-flex;
+/* user info */
+
+#loggedInDisplay .alert {
+    padding-left: 2vw;
+    padding-right: 2vw;
+}
+
+.portal-back {
+    margin: 1vw;
 }
 
 #avatar {
@@ -11,15 +15,215 @@
     position: inherit;
 }
 
+#avatar img {
+    border-style: solid;
+    border-radius: 2mm;
+}
+
 #logoutButtonDiv {
-    text-align: end;
+    padding-left: 80%;
 }
 
 #userInfoDiv {
     display: inline-block;
 }
 
-ul {
+#userInfoDiv .user-display-name, .house-display-name {
+    font-weight: bold;
+}
+
+/* desktop */
+@media only screen and (min-device-width: 768px) {
+    #loggedInDisplay {
+        position:absolute;
+        display:inline-flex;
+    }
+
+    #userInfoDiv .user-display-name {
+        font-size: 1.5vw;
+    }
+
+    #userInfoDiv .house-display-name {
+        font-size: 1vw;
+    }
+
+    .mobile-only {
+        display: none;
+    }
+}
+
+/* mobile */
+@media only screen and (max-device-width: 767px) {
+    #loggedInDisplay {
+        display: block;
+    }
+
+    #userInfoDiv .user-display-name {
+        font-size: 5vw;
+    }
+
+    #userInfoDiv .house-display-name {
+        font-size: 3vw;
+    }
+
+    .desktop-only {
+        display: none;
+    }
+
+    .login > button {
+        height: 20%;
+        width: 80%;
+        font-size: 6vw;
+    }
+
+    .login {
+        text-align: center;
+    }
+}
+
+#loggedInDisplay ul {
     list-style: none;
     padding-left: 0;
+}
+
+#loggedInDisplay {
+    top: 1vw;
+    right: 1vw;
+}
+
+/* work credit report */
+
+[v-cloak] { display: none; }
+
+/* desktop */
+@media only screen and (min-device-width: 768px) {
+    #app {
+        width: 70%;
+        margin: 0 auto;
+    }
+}
+
+/* mobile */
+@media only screen and (max-device-width: 767px) {
+    .mobile-hours-cell {
+        float: right;
+        margin-left: 1vw;
+        border-style: solid;
+        border-width: thin;
+        border-radius: 3mm;
+        padding: 2vw;
+        font-size: 4vw;
+    }
+
+    .mobile-full-width {
+        display: inline;
+    }
+}
+
+#dashboard {
+    height: 20%;
+}
+
+th, td {
+    word-break: break-word;
+    vertical-align: middle !important;
+    text-align: center !important;
+}
+
+.hours-td {
+    text-align: center;
+}
+
+#title {
+    text-align: center;
+    padding-top: 2vw;
+    clear: right;
+}
+
+.nav {
+    padding: 2vw;
+    padding-bottom: 3vw;
+}
+
+.nav-pills > li {
+    margin-left: 1vw;
+}
+
+#submissionsView {
+    text-align: center;
+}
+
+#report {
+    padding-bottom: 50px;
+}
+
+.card-header {
+    padding-left: 30px;
+    cursor: pointer;
+    color: white;
+    background-color: #085f63;
+}
+
+.thead-primary {
+    background-color: #facf5a !important;
+}
+
+.table-positive {
+    background-color: #49beb7 !important;
+}
+
+.table-negative {
+    background-color: #ff5959 !important;
+}
+
+.user-highlight {
+    font-weight: bold;
+}
+
+/* work credit dashboard */
+
+.ldBar-label {
+    display: none;
+}
+
+#progressDiv {
+    text-align: center;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    width: 100%;
+}
+
+#hoursSummary, #otherSummary {
+    padding-bottom: 25px;
+}
+
+#progressDiv > td {
+    display: inline-block;
+    padding: 50%;
+}
+
+#progressDiv > td > tr {
+    padding: 50%;
+}
+
+label {
+    text-align: center;
+}
+
+.submission-label {
+    font-weight: bold;
+}
+
+.error {
+    color: red;
+}
+
+/*admin tools*/
+
+.qty-input > input, .qty-total > input {
+    text-align: center;
+}
+
+.bold-label {
+    font-weight: bold;
 }

@@ -25,21 +25,16 @@ function getSlackConfig($conn) {
     return $config;
 }
 
-function signInWithSlack($conn, $adminOnly = null) {
-    if (isset($_GET['logout'])) {
-        echo 'logged out?';
-        setcookie('token', false, time() - 3600, '/');
-    
-        var_dump($_COOKIE);
-        exit();
-    }
-
+function signInWithSlack($conn, $adminOnly = false, $silent = false) {
     // get config from db
     $config = getSlackConfig($conn);
 
     // previous login
-    if (isset($_COOKIE['token'])) {
-        $config['user_token'] = $_COOKIE['token'];
+    if (isset($_COOKIE['sl_hash'])) {
+        $hash = $_COOKIE['sl_hash'];
+
+        $result = $conn->query("select sl_token from sl_login_tokens where sl_hash = '$hash'");
+        $config['user_token'] = $result->fetch_assoc()['sl_token'];
     }
     // new login
     else if (isset($_GET['code'])) {
@@ -50,8 +45,19 @@ function signInWithSlack($conn, $adminOnly = null) {
             '&code=' . $_GET['code']
         ), true);
 
+        $token = $auth['access_token'];
+
+        $hash = hash('whirlpool', $token . time());
+
         // set cookie and refresh
-        setcookie('token', $auth['access_token'], strtotime( '+30 days' ), '/');
+        setcookie('sl_hash', $hash, strtotime( '+30 days' ), '/');
+
+        $stmt = $conn->prepare("
+            insert into sl_login_tokens (sl_hash, sl_token)
+            values (?, ?)
+        ");
+        $stmt->bind_param('ss', $hash, $token);
+        $stmt->execute();
 
         if (isset($_GET['state'])) {
             $redirect = urldecode($_GET['state']);
@@ -63,14 +69,9 @@ function signInWithSlack($conn, $adminOnly = null) {
     else {
         $redirect = urlencode($_SERVER['PHP_SELF']);
 
-        echo "
-            <a href='https://slack.com/oauth/authorize?scope=identity.basic,identity.email,identity.team,identity.avatar&client_id=787965675794.822220955957&state=$redirect'>
-                <img
-                    alt='Sign in with Slack' height='40' width='172'
-                    src='https://platform.slack-edge.com/img/sign_in_with_slack.png'
-                    srcset='https://platform.slack-edge.com/img/sign_in_with_slack.png 1x, https://platform.slack-edge.com/img/sign_in_with_slack@2x.png 2x'
-                />
-            </a>";
+        include_once($_SERVER['DOCUMENT_ROOT'] . '/includes.php');
+        include_once($_SERVER['DOCUMENT_ROOT'] . '/members-only/login.php');
+
         exit();
     }
 
@@ -92,8 +93,10 @@ function signInWithSlack($conn, $adminOnly = null) {
         die('you do not have permission to access this page');
     }
 
-    // member info popup
-    include($_SERVER['DOCUMENT_ROOT'] . '/includes.php');
+    // show member info popup (unless post request)
+    if (!$silent) {
+        include_once($_SERVER['DOCUMENT_ROOT'] . '/includes.php');
+    }
 
     return $slack;
 }
@@ -132,7 +135,8 @@ class Slack {
             'hour_type_id' => 'i',
             'contribution_date' => 's',
             'description' => 's',
-            'other_req_id' => 'i'
+            'other_req_id' => 'i',
+            'submit_source' => 'i'
         ),
         'wc_time_debits' => array(
             'date_effective' => 's',
@@ -182,20 +186,35 @@ class Slack {
                 'read',
                 true
             )['user'];
-            
+
             $this->admin = $slackUserInfo['is_admin'];
+
             $slackUserInfo = $slackUserInfo['profile'];
 
-            $houseDetails = $this->conn->query("
-                select h.name, u.committee_id from sl_users as u left join sl_houses as h on u.house_id = h.slack_group_id where u.slack_user_id = '$this->userId'
+            $additionalUserDetails = $this->conn->query("
+                select * from sl_users as u left join sl_houses as h on u.house_id = h.slack_group_id where u.slack_user_id = '$this->userId'
             ")->fetch_assoc();
+
+            if ($additionalUserDetails['is_boarder']) {
+                $roles[] = 'Boarder';
+            }
+            else if (!$additionalUserDetails['is_guest']) {
+                $roles[] = 'Resident';
+            }
+            
+            if ($additionalUserDetails['is_admin']) {
+                $roles[] = 'Admin';
+            }
 
             // pare down to the essentials
             $this->userInfo = array(
+                'real_name' => $slackUserInfo['real_name'],
                 'display_name' => $slackUserInfo['display_name'],
                 'avatar' => $slackUserInfo['image_72'],
-                'house' => $houseDetails['name'],
-                'type' => $houseDetails['committee_id'] == 0 ? 'Boarder' : 'Resident'
+                'house' => $additionalUserDetails['name'],
+                'type' => implode('/', $roles),
+                'is_boarder' => $additionalUserDetails['is_boarder'],
+                'is_guest' => $additionalUserDetails['is_guest']
             );
         }
     }
@@ -340,6 +359,8 @@ class Slack {
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param($params, ...$values);
         $stmt->execute();
+
+        return $stmt->affected_rows;
     }
 
     public function addToUsergroup($user_id, $usergroup_id) {
@@ -365,6 +386,48 @@ class Slack {
         );
     }
 
+    public function removeFromUsergroups($user_id, $usergroup_id, $table) {
+        $usergroups = $this->sqlSelect("select slack_group_id, slack_channel_id from $table where slack_group_id <> '$usergroup_id'");
+
+        foreach ($usergroups as $usergroup) {
+            $usergroup_id = $usergroup['slack_group_id'];
+            $channel_id = $usergroup['slack_channel_id'];
+
+            // get current list of users
+            $users = $this->apiCall(
+                'usergroups.users.list',
+                'usergroup=' . $usergroup_id,
+                'read',
+                true
+            )['users'];
+
+            // remove user, if exists
+            if (($key = array_search($user_id, $users)) !== false) {
+                unset($users[$key]);
+
+                // save updated list
+                $this->apiCall(
+                    'usergroups.users.update',
+                    array(
+                        'usergroup' => $usergroup_id,
+                        'users' => $users
+                    ),
+                    'write'
+                );
+
+                // remove user from matching channel
+                debug($this->apiCall(
+                    'conversations.kick',
+                    array(
+                        'channel' => $channel_id,
+                        'users' => $user_id
+                    ),
+                    'write'
+                ));
+            }
+        }
+    }
+
     public function importSlackUsersToDb() {
         $users = $this->apiCall('users.list')['members'];
 
@@ -378,8 +441,6 @@ class Slack {
             deleted
         ) values ';
         $values = array();
-
-        // todo figure out how to get pronouns and committees
 
         foreach ($users as $user) {
             if (!$user['is_bot'] && $user['id'] != 'USLACKBOT') {
@@ -404,7 +465,11 @@ class Slack {
         is_admin = values(is_admin),
         deleted = values(deleted)';
 
-        $this->conn->query($sql);
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+
+        // todo return something more helpful (affected_rows returns 1 or 2)
+        return $stmt->affected_rows;
     }
 
     public function sendEmail($fromUserId, $subject, $body, $house_id = null, $reallySend = false) {
@@ -650,7 +715,7 @@ class Slack {
         return $viewJson;
     }
 
-    public function updateUserProfile($user_id, $inputValues = 'null') {
+    public function updateUserProfile($user_id, $inputValues = null) {
         if ($inputValues) {
             $result = $this->apiCall(
                 'users.profile.set',
@@ -770,13 +835,19 @@ class Slack {
 
         // todo multi-insert
         foreach ($data as $row) {
-            $this->sqlInsert('wc_user_reqs', $row);
+            $this->sqlInsert('wc_user_req_modifiers', $row);
         }
     }
 
+    // todo maybe check to make dates are unique
+    // todo cron jobs - monthly and yearly
     public function scheduleHoursDebit($user_id, $typeId, $newMember = false) {
-        $defaultHours = $this->sqlSelect("select default_qty from wc_lookup_hour_types where id = $typeId");
-        $hoursMod = $this->sqlSelect("select default_qty from wc_user_req_modifiers where id = $typeId and slack_user_id = $user_id");
+        $is_boarder = $this->sqlSelect("select is_boarder from sl_users where slack_user_id = '$user_id'");
+        $hourTypes = $this->sqlSelect("select name, default_qty, default_qty_boarder from wc_lookup_hour_types where id = $typeId");
+
+        $defaultHours = $is_boarder ? $hourTypes['default_qty_boarder'] : $hourTypes['default_qty'];
+
+        $hoursMod = $this->sqlSelect("select qty_modifier from wc_user_req_modifiers where hour_type_id = $typeId and slack_user_id = $user_id");
         $hours = $defaultHours + $hoursMod;
 
         if ($newMember && $typeId != 3) {
@@ -799,5 +870,7 @@ class Slack {
             'hours_debited' => $hours,
             'hour_type_id' => $typeId
         ));
+
+        return $hourTypes['name'];
     }
 }
