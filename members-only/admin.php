@@ -5,14 +5,6 @@ require_once($_SERVER['DOCUMENT_ROOT'] . '/functions.php');
 // $slack is available for additional API calls
 $slack = signInWithSlack($conn, true);
 
-// todo make button
-// $slack->importSlackUsersToDb();
-
-// $hourTypes = $slack->sqlSelect("select id from wc_lookup_hour_types");
-
-// foreach ($hourTypes as $id) {
-//     $slack->scheduleHoursDebit($slack->userId, $id);
-// }
 ?>
 <script type="text/javascript" src="admin.js"></script>
 
@@ -22,17 +14,6 @@ $slack = signInWithSlack($conn, true);
     <h1 class="display-4">Admin Tools</h1>
     <p class="lead">The tools available on this page are for admins only! Please proceed with caution.</p>
     <hr class="my-4">
-    <p class="lead">
-        <button class="btn btn-primary btn-lg action-button" data-action="scheduleHoursDebit" role="button">
-            <span class="button-label">Schedule Hour Debits</span>
-            <div class="button-loading" style="display: none">
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                <span class="sr-only">Please wait...</span>
-                <span> Please wait...</span>
-            </div>
-        </button>
-    </p>
-    <p>This button should be pressed on the first of each month to update the hours due for each member.</p>
     <p class="lead">
         <button class="btn btn-primary btn-lg action-button" data-action="syncSlackUsers" role="button">
             <span class="button-label">Force Sync User Data From Slack</span>
@@ -56,6 +37,8 @@ $slack = signInWithSlack($conn, true);
     </p>
     <p>Make per-member adjustments to hour requirements</p>
 </div>
+
+<!--todo button to manage adhoc users-->
 
 <div class="modal fade" id="adjustRequirementsModal" tabindex="-1" role="dialog" aria-labelledby="adjustRequirementsLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">

@@ -1,6 +1,13 @@
 <?php
 require_once('dbconnect.php');
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require 'resources/PHPMailer/src/Exception.php';
+require 'resources/PHPMailer/src/PHPMailer.php';
+require 'resources/PHPMailer/src/SMTP.php';
+
 function debug($value, $compact = null) {
     if (is_array($value)) {
         if ($compact) {
@@ -12,6 +19,59 @@ function debug($value, $compact = null) {
     }
 
     echo "\r\n" . '~START~ ' . "\r\n" . $value . "\r\n" . ' ~END~' . "\r\n";
+}
+
+function email($toAddresses, $subject, $body, $ccAddresses = null) {
+    $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
+
+    try {
+        //Server settings
+        $mail->SMTPDebug = 2;                                 // Enable verbose debug output
+        $mail->isSMTP();                                      // Set mailer to use SMTP
+        $mail->Host = 'smtp.dreamhost.com';                   // Specify main and backup SMTP servers
+        $mail->SMTPAuth = true;                               // Enable SMTP authentication
+        $mail->Username = 'baby.yoda@rchc.coop';              // SMTP username
+        $mail->Password = '5!0#08LY6cfG';                           // SMTP password
+        $mail->SMTPSecure = 'tls';                            // Enable TLS encryption, `ssl` also accepted
+        $mail->Port = 587;                                    // TCP port to connect to
+
+        //Recipients
+        $mail->setFrom('baby.yoda@rchc.coop', 'Baby Yoda');          //This is the email your form sends From
+
+        if (!is_array($toAddresses)) {
+            $toAddresses = array($toAddresses);
+        }
+
+        foreach ($toAddresses as $address) {
+            $mail->addAddress($address); // Add a recipient address
+        }
+
+        if (isset($ccAddresses)) {
+            foreach ($ccAddresses as $address) {
+                $mail->addCC($address);
+            }
+        }
+
+        //$mail->addAddress('contact@example.com');               // Name is optional
+        //$mail->addReplyTo('info@example.com', 'Information');
+        //$mail->addBCC('bcc@example.com');
+
+        //Attachments
+        //$mail->addAttachment('/var/tmp/file.tar.gz');         // Add attachments
+        //$mail->addAttachment('/tmp/image.jpg', 'new.jpg');    // Optional name
+
+        //Content
+//        $mail->isHTML(true);                                  // Set email format to HTML
+        $mail->Subject = $subject;
+        $mail->Body    = $body;
+        //$mail->AltBody = 'This is the body in plain text for non-HTML mail clients';
+
+        $mail->send();
+        echo 'Message has been sent';
+    } catch (Exception $e) {
+        echo 'Message could not be sent.';
+        echo 'Mailer Error: ' . $mail->ErrorInfo;
+    }
 }
 
 function getSlackConfig($conn) {
@@ -29,15 +89,8 @@ function signInWithSlack($conn, $adminOnly = false, $silent = false) {
     // get config from db
     $config = getSlackConfig($conn);
 
-    // previous login
-    if (isset($_COOKIE['sl_hash'])) {
-        $hash = $_COOKIE['sl_hash'];
-
-        $result = $conn->query("select sl_token from sl_login_tokens where sl_hash = '$hash'");
-        $config['user_token'] = $result->fetch_assoc()['sl_token'];
-    }
     // new login
-    else if (isset($_GET['code'])) {
+    if (isset($_GET['code'])) {
         $auth = json_decode(file_get_contents(
             'https://slack.com/api/oauth.access?' .
             'client_id=' . $config['CLIENT_ID'] .
@@ -65,6 +118,25 @@ function signInWithSlack($conn, $adminOnly = false, $silent = false) {
             header("Location: $redirect");
             exit();
         }
+    }
+    // previous login
+    else if (isset($_COOKIE['sl_hash'])) {
+        $hash = $_COOKIE['sl_hash'];
+
+        $result = $conn->query("select sl_token from sl_login_tokens where sl_hash = '$hash'");
+        $config['user_token'] = $result->fetch_assoc()['sl_token'];
+
+        if (!isset($config['user_token'])) {
+            unset($_COOKIE['sl_hash']);
+            setcookie("sl_hash", "", time() - 3600);
+
+            $redirect = urlencode($_SERVER['PHP_SELF']);
+
+            include_once($_SERVER['DOCUMENT_ROOT'] . '/includes.php');
+            include_once($_SERVER['DOCUMENT_ROOT'] . '/members-only/login.php');
+
+            exit();
+        };
     }
     else {
         $redirect = urlencode($_SERVER['PHP_SELF']);
@@ -109,6 +181,12 @@ class Slack {
     public $admin;
 
     public $dbFields = array(
+        'event_logs' => array(
+            'slack_user_id' => 's',
+            'event_type' => 's',
+            'details' => 's',
+            'initiated_by_cron' => 'i'
+        ),
         'sl_users' => array(
             'slack_user_id' => 's',
             'real_name' => 's',
@@ -317,10 +395,14 @@ class Slack {
         $fieldKeys = array_keys($dbFields);
         $primaryKey = ($table == 'sl_view_states' ? 'slack_view_id' : 'slack_user_id');
 
+        if ($table == 'event_logs') {
+            unset($primaryKey);
+        }
+
         $fields = array();
         $values = array();
         $preparedValues = array();
-        $updates = array();
+        $updates = null;
         $params = '';
 
         foreach ($data as $key => $value) {
@@ -330,10 +412,12 @@ class Slack {
                 $params .= $dbFields[$key];
             }
         }
-        
-        foreach ($fields as $field) {
-            if ($field != $primaryKey) {
-                $updates[] = $field . ' = values(' . $field . ')';
+
+        if (isset($primaryKey)) {
+            foreach ($fields as $field) {
+                if ($field != $primaryKey) {
+                    $updates[] = $field . ' = values(' . $field . ')';
+                }
             }
         }
 
@@ -343,18 +427,21 @@ class Slack {
 
         $fields = implode(', ', $fields);
         $preparedValues = implode(', ', $preparedValues);
-        $updates = implode(', ', $updates);
 
         $sql = "
             insert into $table ($fields)
                 values ($preparedValues)
-            on duplicate key update
-                $updates
         ";
 
-        // debug($sql);
-        // debug($params);
-        // debug($values);
+        if (isset($updates)) {
+            $updates = implode(', ', $updates);
+
+            $sql .= " on duplicate key update $updates";
+        }
+
+//         debug($sql);
+//         debug($params);
+//         debug($values);
         
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param($params, ...$values);
@@ -472,34 +559,37 @@ class Slack {
         return $stmt->affected_rows;
     }
 
+    // todo more testing with new email function
     public function sendEmail($fromUserId, $subject, $body, $house_id = null, $reallySend = false) {
         $sql = "
             select
                 slack_user_id,
-                slack_username,
                 email,
                 house_id,
                 is_admin
             from sl_users
             where deleted <> 1";
 
-        $result = $this->conn->query($sql);
+        $users = $this->sqlSelect($sql);
+
+        $userEmails = array();
+        $adminEmails = array();
 
         // get email lists
-        while ($row = $result->fetch_assoc()) {
-            if ($row['slack_user_id'] == $fromUserId) {
-                $fromEmail = $row['email'];
+        foreach ($users as $user) {
+            if ($user['slack_user_id'] == $fromUserId) {
+                $fromEmail = $user['email'];
             }
-            if ($row['is_admin'] == 1) {
-                $adminEmails[] = $row['email'];
+            if ($user['is_admin'] == 1) {
+                $adminEmails[] = $user['email'];
             }
             if (isset($house_id)) {
-                if ($row['house_id'] == $house_id) {
-                    $userEmails[] = $row['email'];
+                if ($user['house_id'] == $house_id) {
+                    $userEmails[] = $user['email'];
                 }
             }
             else {
-                $userEmails[] = $row['email'];
+                $userEmails[] = $user['email'];
             }
         }
 
@@ -511,9 +601,7 @@ class Slack {
 
         // if house specific, get user readable name
         if ($house_id) {
-            $sql = "select name from sl_houses where id = $house_id";
-            $result = $this->conn->query($sql);
-            $house = $result->fetch_assoc()['name'];
+            $house = $this->sqlSelect("select name from sl_houses where id = $house_id");
             $house = 'all residents and boarders of ' . $house;
         }
 
@@ -525,7 +613,7 @@ class Slack {
             $toEmails = $userEmails;
 
             // CC all current admins
-            $cc = implode(',', $adminEmails);
+            $cc = $adminEmails;
 
             $subject = '[RCHC] ' . $subject;
         }
@@ -537,10 +625,7 @@ class Slack {
             $body .= "\r\n\r\n" . '---' . "\r\n" . "This email was intended for the following email addresses: " . "\r\n" . $emailDump;
         }
 
-        $toEmails = implode(',', $toEmails);
-        $headers = 'From: baby-yoda@rchc.coop' . (isset($cc) ? "\r\n" . 'Cc: ' . $cc : '');
-
-        mail($toEmails, $subject, $body, $headers);
+        email('izneuhaus@gmail.com', $subject, $body, isset($cc) ? $cc : null);
     }
 
     public function buildProfileModal($profileData) {
@@ -812,7 +897,7 @@ class Slack {
         return $inputValues;
     }
 
-    // todo - for adding modifiers to requirments
+    // todo - for adding modifiers to requirements
     public function modifyWorkCreditUserReqs($user_id, $data = null) {
         $lookups = array(
             'hours' => $this->sqlSelect("select id, default_qty from wc_lookup_hour_types"),
@@ -840,15 +925,25 @@ class Slack {
     }
 
     // todo maybe check to make dates are unique
-    // todo cron jobs - monthly and yearly
     public function scheduleHoursDebit($user_id, $typeId, $newMember = false) {
-        $is_boarder = $this->sqlSelect("select is_boarder from sl_users where slack_user_id = '$user_id'");
+        $userInfo = $this->sqlSelect("select is_boarder, wc_only from sl_users where slack_user_id = '$user_id'");
         $hourTypes = $this->sqlSelect("select name, default_qty, default_qty_boarder from wc_lookup_hour_types where id = $typeId");
 
-        $defaultHours = $is_boarder ? $hourTypes['default_qty_boarder'] : $hourTypes['default_qty'];
+        $defaultHours = $userInfo['is_boarder'] == 1 ? $hourTypes['default_qty_boarder'] : $hourTypes['default_qty'];
 
-        $hoursMod = $this->sqlSelect("select qty_modifier from wc_user_req_modifiers where hour_type_id = $typeId and slack_user_id = $user_id");
-        $hours = $defaultHours + $hoursMod;
+        $hoursMod = $this->sqlSelect("select qty_modifier from wc_user_req_modifiers where hour_type_id = $typeId and slack_user_id = '$user_id'");
+
+        if ($userInfo['wc_only'] == 1) {
+            if ($hoursMod) {
+                $hours = $hoursMod;
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            $hours = $defaultHours + $hoursMod;
+        }
 
         if ($newMember && $typeId != 3) {
             $hours = $hours / 2;
@@ -868,7 +963,8 @@ class Slack {
             'date_effective' => $date,
             'slack_user_id' => $user_id,
             'hours_debited' => $hours,
-            'hour_type_id' => $typeId
+            'hour_type_id' => $typeId,
+            'description' => 'Automated ' . ($typeId == 3 ? 'yearly' : 'monthly') . ' hours debit'
         ));
 
         return $hourTypes['name'];

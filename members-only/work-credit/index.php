@@ -112,15 +112,24 @@ require_once('getData.php');
                                                 <div v-if="data.item.next_debit_qty[1]">
                                                     <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[1] }} / {{ data.item.next_debit_qty[1] }}</span>
                                                 </div>
+                                                <div v-else>
+                                                    <span>N/A</span>
+                                                </div>
                                             </template>
                                             <template v-slot:cell(collective_hours)="data">
                                                 <div v-if="data.item.next_debit_qty[2]">
                                                     <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[2] }} / {{ data.item.next_debit_qty[2] }}</span>
-                                                <div> 
+                                                </div>
+                                                <div v-else>
+                                                    <span>N/A</span>
+                                                </div>
                                             </template>
                                             <template v-slot:cell(maintenance_hours)="data">
                                                 <div v-if="data.item.next_debit_qty[3]">
                                                     <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[3] }} / {{ data.item.next_debit_qty[3] }}</span>
+                                                </div>
+                                                <div v-else>
+                                                    <span>N/A</span>
                                                 </div>
                                             </template>
                                         </b-table>
@@ -208,7 +217,7 @@ require_once('getData.php');
                 </div>
             </div>
             <div id="submissions" style="padding-bottom:10%" class="tab-pane fade" role="tabpanel" aria-labelledby="submissions-tab">
-                <template>
+                <template v-if="submissions">
                     <div class="overflow-auto">
                         <b-pagination
                             v-model="currentPage"
@@ -231,6 +240,7 @@ require_once('getData.php');
                         ></b-table>
                     </div>
                 </template>
+                <h4 v-else style="text-align: center">No submissions found.</h4>
             </div>
         </div>
         <div class="modal fade" id="submitTimeModal" tabindex="-1" role="dialog" aria-labelledby="submitTimeModalLabel" aria-hidden="true">
@@ -270,7 +280,7 @@ require_once('getData.php');
                             </div>
                             <div class="form-group">
                                 <label for="hours_credited" class="submission-label">Hours Completed:</label>
-                                <input type="number" step="0.25" min="0.25" max="99" class="form-control" id="hours_credited" name="hours_credited" required>
+                                <input type="number" step="0.25" min="0.25" max="24" class="form-control" id="hours_credited" name="hours_credited" required>
                             </div>
                             <div class="form-group">
                                 <label for="contribution_date" class="submission-label">Date of Contribution:</label>

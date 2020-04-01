@@ -196,11 +196,14 @@ $submissionData = $slack->sqlSelect("
     order by tc.id desc
 ", null, true);
 
-$reportData['submissions'] = array(
-    'fields' => array_keys($submissionData[0]), // todo throws error when no submissions
-    'items' => $submissionData,
-    'currentPage' => 1,
-    'perPage' => 50
-);
-
-?>
+if ($submissionData) {
+    $reportData['submissions'] = array(
+        'fields' => array_keys($submissionData[0]),
+        'items' => $submissionData,
+        'currentPage' => 1,
+        'perPage' => 50
+    );
+}
+else {
+    $reportData['submissions'] = false;
+}

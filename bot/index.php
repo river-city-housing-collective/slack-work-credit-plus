@@ -70,8 +70,7 @@ else if ($type == 'block_actions') {
 
     $profileData = $slack->sqlSelect("select * from sl_users where slack_user_id = '$user_id'");
 
-    // todo make sure pronouns are working
-    $profileData['pronouns'] = $slack->apiCall('users.profile.get', array('user' => $user_id))
+    $profileData['pronouns'] = $slack->apiCall('users.profile.get', 'user=' . $user_id, 'read', true)
         ['profile']['fields'][$slack->config['PRONOUNS_FIELD_ID']]['value'];
 
     // opening modals on app home
@@ -79,7 +78,7 @@ else if ($type == 'block_actions') {
         $view = $eventPayload['actions'][0]['value'];
 
         // todo restricting WIP stuff to admins for now (also hide stuff for guests)
-        if (!$profileData['is_admin'] && in_array($view, array('send-email-modal', 'submit-time-modal'))) {
+        if (!$profileData['is_admin'] && in_array($view, array('send-email-modal'))) {
             $view = 'under-construction';
         }
 
@@ -235,17 +234,19 @@ else if ($type == 'view_submission') {
                 )
             ));
         }
-        else if (intval($inputValues['hours_credited']) >= 99) {
+        else if (intval($inputValues['hours_credited']) >= 24) {
             echo json_encode(array(
                 'response_action' => 'errors',
                 'errors' => array(
-                    'hours_credited' => 'Wow, that\'s a lot of hours! Did you misplace a decimal?'
+                    'hours_credited' => 'There are only 24 hours in a day!'
                 )
             ));
         }
 
         $inputValues['slack_user_id'] = $user_id;
         $inputValues['submit_source'] = 1; // submitting from slack
+
+        $inputValues = $slack->getStoredViewData($user_id, $view_id, $inputValues);
 
         if (!isset($inputValues['hour_type_id'])) {
             $inputValues['hour_type_id'] = '1';
