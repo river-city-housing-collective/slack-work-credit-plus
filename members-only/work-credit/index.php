@@ -5,8 +5,22 @@ require_once('getData.php');
 <script>
     let data = <?= json_encode($reportData) ?>;
 
-    data['submissions']['fields'] = $.map(data['submissions']['fields'], function (field) {
-        return {'key': field, 'sortable': true};
+    $.each(data['submissions']['fields'], function () {
+        this['sortable'] = true;
+
+        let classes = [];
+
+        // enable select filter for categorical columns
+        if (['real_name', 'name'].includes(this['key'])) {
+            classes.push('filter-select');
+        }
+
+        // make name and description wider
+        if (['real_name', 'name', 'description'].includes(this['key'])) {
+            classes.push('credit-' + this['key'] + '-column');
+        }
+
+        this['class'] = classes.join(' ');
     });
 
     data['userInfo'] = userInfo;
@@ -23,7 +37,7 @@ require_once('getData.php');
     <script src="//polyfill.io/v3/polyfill.min.js?features=es2015%2CIntersectionObserver" crossorigin="anonymous"></script>
 
     <!-- Load Vue followed by BootstrapVue -->
-    <script src="/resources/vue.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.11"></script>
     <script src="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
 
     <!-- Load the following for BootstrapVueIcons support -->
@@ -38,6 +52,13 @@ require_once('getData.php');
 
     <!-- jquery validator -->
     <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.1/dist/jquery.validate.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/tablesorter@2.31.3/dist/js/jquery.tablesorter.combined.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tablesorter@2.31.3/dist/css/theme.bootstrap_4.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tablesorter@2.31.3/dist/css/jquery.tablesorter.pager.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/extras/jquery.tablesorter.pager.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sugar/2.0.6/sugar.min.js" integrity="sha256-5AA1KsUNzfgrGh3+JagBdys+ArLrYa9Q2JkKfPioAS8=" crossorigin="anonymous"></script>
 
     <link href="/style.css" rel="stylesheet">
     <script src="/members-only/work-credit/work-credit.js"></script>
@@ -158,7 +179,7 @@ require_once('getData.php');
                                                 <div style="display:inline-block" :class="styleUser(data.item.real_name)">
                                                     <div v-if="data.item.next_debit_qty[3]" class="mobile-hours-cell" :class="'table-' + data.item._cellVariants.maintenance_hours">
                                                         <p>&#128736;</p>
-                                                        {{ data.item.hours_credited[2] }} / {{ data.item.next_debit_qty[3] }}
+                                                        {{ data.item.hours_credited[3] }} / {{ data.item.next_debit_qty[3] }}
                                                     </div>
                                                     <div v-if="data.item.next_debit_qty[2]" class="mobile-hours-cell" :class="'table-' + data.item._cellVariants.collective_hours">
                                                         <p>&#10024;</p>
@@ -217,27 +238,32 @@ require_once('getData.php');
                 </div>
             </div>
             <div id="submissions" style="padding-bottom:10%" class="tab-pane fade" role="tabpanel" aria-labelledby="submissions-tab">
+                <!-- pager -->
+                <div id="pager" class="pager">
+                    <form>
+                        <img src="first.png" class="first"/>
+                        <img src="prev.png" class="prev"/>
+                        <!-- the "pagedisplay" can be any element, including an input -->
+                        <span class="pagedisplay" data-pager-output-filtered="{startRow:input} &ndash; {endRow} / {filteredRows} of {totalRows} total rows"></span>
+                        <img src="next.png" class="next"/>
+                        <img src="last.png" class="last"/>
+                        <select class="pagesize">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="30">30</option>
+                            <option value="40">40</option>
+                            <option value="all">All Rows</option>
+                        </select>
+                    </form>
+                </div>
                 <template v-if="submissions">
                     <div class="overflow-auto">
-                        <b-pagination
-                            v-model="currentPage"
-                            :total-rows="submissionRows"
-                            :per-page="submissions['perPage']"
-                            aria-controls="submissionsTable"
-                        ></b-pagination>
-
-                        <p class="mt-3">Current Page: {{ currentPage }}</p>
-
-                        <b-table
+                        <b-table-lite
                             id="submissionsTable"
                             :items="submissions['items']"
                             :fields="submissions['fields']"
-                            :per-page="submissions['perPage']"
-                            :current-page="submissions['currentPage']"
-                            small
-                            striped
-                            head-variant="primary"
-                        ></b-table>
+                        >
+                        </b-table-lite>
                     </div>
                 </template>
                 <h4 v-else style="text-align: center">No submissions found.</h4>

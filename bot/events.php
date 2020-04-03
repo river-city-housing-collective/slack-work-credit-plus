@@ -35,6 +35,9 @@ if ($type == 'app_home_opened') {
         'bot'
     );
 }
+// todo only update single user
 else if ($type = 'user_change') {
-    $slack->saveSlackUserToDb($user_id);
+    $slack->importSlackUsersToDb();
 }
+
+//todo cron reminders to submit hours at end of month

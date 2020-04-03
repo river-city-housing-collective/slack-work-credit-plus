@@ -225,8 +225,10 @@ else if ($type == 'view_submission') {
         $slack->sendEmail($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id']);
     }
     else if ($callback_id == 'submit-time-modal') {
+        $decimalCheck = $inputValues['hours_credited'] != 0.25 ? fmod($inputValues['hours_credited'], 0.25) != 0 : false;
+
         // if hours are not valid, throw error
-        if (!is_numeric($inputValues['hours_credited']) || !(fmod($inputValues['hours_credited'], 0.25) == 0)) {
+        if (!is_numeric($inputValues['hours_credited']) || $decimalCheck) {
             echo json_encode(array(
                 'response_action' => 'errors',
                 'errors' => array(
@@ -242,17 +244,30 @@ else if ($type == 'view_submission') {
                 )
             ));
         }
-
-        $inputValues['slack_user_id'] = $user_id;
-        $inputValues['submit_source'] = 1; // submitting from slack
-
-        $inputValues = $slack->getStoredViewData($user_id, $view_id, $inputValues);
-
-        if (!isset($inputValues['hour_type_id'])) {
-            $inputValues['hour_type_id'] = '1';
+        else if ($inputValues['hours_credited'] <= 0) {
+            echo json_encode(array(
+                'response_action' => 'errors',
+                'errors' => array(
+                    'hours_credited' => 'Please enter a positive number'
+                )
+            ));
         }
+        // no errors, submit
+        else {
+            $inputValues['slack_user_id'] = $user_id;
+            $inputValues['submit_source'] = 1; // submitting from slack
 
-        $slack->sqlInsert('wc_time_credits', $inputValues);
+            $inputValues = $slack->getStoredViewData($user_id, $view_id, $inputValues);
+
+            if (!isset($inputValues['hour_type_id'])) {
+                $inputValues['hour_type_id'] = '1';
+            }
+            if (!isset($inputValues['other_req_id'])) {
+                $inputValues['other_req_id'] = '0';
+            }
+
+            $slack->sqlInsert('wc_time_credits', $inputValues);
+        }
     }
     // save room_id to views table and update profile modal
     else if ($callback_id == 'profile-room-popup') {

@@ -184,21 +184,51 @@ $reportData['perPage'] = 3;
 // get time records
 $submissionData = $slack->sqlSelect("
     select
-        tc.timestamp as 'Timestamp',
-        u.real_name as 'Member',
-        tc.hours_credited as 'Hours Completed',
-        lht.name as 'Type of Hours',
-        tc.contribution_date as 'Date of Contribution',
-        tc.description as 'Description of Work Completed'
+        tc.timestamp,
+        u.real_name,
+        tc.hours_credited,
+        lht.name,
+        tc.contribution_date,
+        tc.description
     from wc_time_credits as tc
     left join sl_users as u on u.slack_user_id = tc.slack_user_id
     left join wc_lookup_hour_types as lht on lht.id = tc.hour_type_id
     order by tc.id desc
 ", null, true);
 
+//todo cst timezone
+//todo 12 hour format
+
 if ($submissionData) {
+    $fields = array(
+        array(
+            'key' => 'timestamp',
+            'label' => 'Timestamp'
+        ),
+        array(
+            'key' => 'real_name',
+            'label' => 'Member'
+        ),
+        array(
+            'key' => 'hours_credited',
+            'label' => 'Hours'
+        ),
+        array(
+            'key' => 'name', // todo db fields could use some refactoring
+            'label' => 'Type'
+        ),
+        array(
+            'key' => 'contribution_date',
+            'label' => 'Date of Contribution'
+        ),
+        array(
+            'key' => 'description',
+            'label' => 'Description of Work Completed'
+        )
+    );
+
     $reportData['submissions'] = array(
-        'fields' => array_keys($submissionData[0]),
+        'fields' => $fields,
         'items' => $submissionData,
         'currentPage' => 1,
         'perPage' => 50
