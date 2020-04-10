@@ -39,6 +39,10 @@ if (isset($eventPayload['view'])) {
 else if (isset($eventPayload['callback_id'])) {
     $callback_id = $eventPayload['callback_id'];
 }
+else {
+    $callback_id = null;
+    $view_id = null;
+}
 
 // for testing - just return the payload
 // echo 'PAYLOAD SENT - ' . json_encode($eventPayload);
@@ -86,23 +90,7 @@ else if ($type == 'block_actions') {
             $viewJson = $slack->buildProfileModal($profileData);
         }
         else if ($view == 'submit-time-modal') {
-            $workCreditCheck = $slack->sqlSelect("
-                select * from wc_time_debits
-                where slack_user_id = '$user_id'
-                order by date_effective desc limit 1
-            ");
-
-            if (!$workCreditCheck) {
-                $view = 'work-credit-warning';
-            }
-
-            $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
-
-            // todo hide/disable other hour types for boarders
-            if (!$profileData['is_boarder']) {
-                $otherReqsQuestion = json_decode(file_get_contents('views/time-resident-addon.json'), TRUE);
-                array_push($viewJson['blocks'], $otherReqsQuestion);
-            }
+            $viewJson = $slack->buildWorkCreditModal($profileData);
         }
         else {
             $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
@@ -208,6 +196,19 @@ else if ($type == 'block_actions') {
                 ));
             }
         }
+    }
+    // work credit /hours
+    else if ($actionValue == 'submit_time') {
+        $viewJson = $slack->buildWorkCreditModal($profileData);
+
+        echo json_encode($slack->apiCall(
+            'views.open',
+            array(
+                'view' => $viewJson,
+                'trigger_id' => $trigger_id
+            ),
+            'bot'
+        ));
     }
 
     $slack->conn->query("

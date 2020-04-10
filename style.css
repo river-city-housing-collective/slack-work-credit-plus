@@ -96,7 +96,7 @@
 [v-cloak] { display: none; }
 
 /* desktop */
-@media only screen and (min-device-width: 768px) {
+@media only screen and (min-device-width: 769px) {
     #app {
         width: 80%;
         margin: 0 auto;
@@ -104,7 +104,7 @@
 }
 
 /* mobile */
-@media only screen and (max-device-width: 767px) {
+@media only screen and (max-device-width: 768px) {
     .mobile-hours-cell {
         float: right;
         margin-left: 1vw;
@@ -118,6 +118,14 @@
     .mobile-full-width {
         display: inline;
     }
+
+    /*.table.b-table.b-table-stacked-md > caption,*/
+    /*.table.b-table.b-table-stacked-md > tbody,*/
+    /*.table.b-table.b-table-stacked-md > tbody > tr,*/
+    /*.table.b-table.b-table-stacked-md > tbody > tr > td,*/
+    /*.table.b-table.b-table-stacked-md > tbody > tr > th {*/
+    /*    display: grid !important;*/
+    /*}*/
 }
 
 #dashboard {
@@ -128,16 +136,18 @@ th, td {
     word-break: break-word;
     vertical-align: middle !important;
     text-align: center;
+    white-space: nowrap;
 }
 
 .credit-description {
     text-align: left;
 }
 
-.credit-name-column, .credit-real_name-column, th {
+.credit-name-column, .credit-real_name-column, .credit-other_req-column, th {
     white-space:nowrap;
 }
 
+/*todo overflow text*/
 .credit-description-column {
     width: 30%;
 }
@@ -238,6 +248,17 @@ label {
 
 .bold-label {
     font-weight: bold;
+}
+
+.input-group>.input-group-prepend {
+    flex: 0 0 30%;
+}
+/*.input-group .input-group-text {*/
+/*    width: 100%;*/
+/*}*/
+
+#doorCodeForm {
+    text-align: center;
 }
 
 /*tablesorter pager*/

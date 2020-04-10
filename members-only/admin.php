@@ -14,32 +14,53 @@ $slack = signInWithSlack($conn, true);
     <h1 class="display-4">Admin Tools</h1>
     <p class="lead">The tools available on this page are for admins only! Please proceed with caution.</p>
     <hr class="my-4">
-    <p class="lead">
-        <button class="btn btn-primary btn-lg action-button" data-action="syncSlackUsers" role="button">
-            <span class="button-label">Force Sync User Data From Slack</span>
-            <div class="button-loading" style="display: none">
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                <span class="sr-only">Please wait...</span>
-                <span> Please wait...</span>
-            </div>
-        </button>
-    </p>
-    <p>Re-sync all user information from Slack to the Work Credit database (use this if someone's name isn't appearing in the Work Credit Report).</p>
-    <p class="lead">
-        <button class="btn btn-primary btn-lg action-button" data-action="getUserRequirements" role="button">
-            <span class="button-label">Adjust Work Credit Requirements</span>
-            <div class="button-loading" style="display: none">
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                <span class="sr-only">Please wait...</span>
-                <span> Please wait...</span>
-            </div>
-        </button>
-    </p>
-    <p>Make per-member adjustments to hour requirements</p>
+    <div id="buttons"></div>
 </div>
 
-<!--todo button to manage adhoc users-->
-
+<div class="modal fade" id="updateDoorCodeModal" tabindex="-1" role="dialog" aria-labelledby="updateDoorCodeLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Update Door Code</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form class="modal-form">
+                <div class="modal-body">
+                    <p>Active users can request these codes in Slack via the <code>/code</code> command. You may optionally send an email notification out upon saving as well.</p>
+                    <hr class="my-4">
+                    <div class="input-group mb-8 justify-content-center">
+                        <div class="input-group-prepend">
+                            <select class="custom-select" name="slack_group_id" id="selectHouse" style="width=100%">
+                                <option value="" selected>Choose...</option>
+                            </select>
+                        </div>
+                        <input type="text" class="form-control col-2" style="text-align: center;" id="doorCodeInput" name="door_code" aria-label="Door Code" disabled>
+                        <div class="input-group-append">
+                            <button class="btn btn-success randomize-code" type="button"><i class="fas fa-random"></i> Randomize</button>
+                        </div>
+                    </div>
+                    <hr class="my-4">
+                    <div class="alert alert-danger" role="alert">
+                        <strong>Warning:</strong> Be sure to deactivate old user accounts prior to making changes or they may be able to easily gain access to the new door codes.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancelDoorCode" class="btn btn-secondary cancel-button" data-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary action-button" type="button" id="updateDoorCode" data-action="updateDoorCode" data-method="save" disabled>
+                        <span class="submit-label">Save</span>
+                        <div class="submitted-label" style="display: none">
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span class="sr-only">Saving...</span>
+                            <span> Saving...</span>
+                        </div>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="adjustRequirementsModal" tabindex="-1" role="dialog" aria-labelledby="adjustRequirementsLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -49,7 +70,7 @@ $slack = signInWithSlack($conn, true);
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <form id="submissionForm">
+            <form class="modal-form">
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="userSelect" class="bold-label">
@@ -59,7 +80,7 @@ $slack = signInWithSlack($conn, true);
                             </span>
                             <span> User: </span>
                         </label>
-                        <select class="form-control" id="userSelect" name="userSelect" data-action="getRequirementMods">
+                        <select class="form-control" id="userSelect" name="user_id" data-action="adjustRequirements">
                             <option value="" selected>Select</option>
                         </select>
                     </div>
@@ -93,10 +114,10 @@ $slack = signInWithSlack($conn, true);
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" id="cancelModifiers" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button class="btn btn-primary" type="button" id="saveModifers" data-action="saveUserRequirements" disabled>
-                        <span id="saveText">Save</span>
-                        <div id="savingText" style="display: none">
+                    <button type="button" id="cancelModifiers" class="btn btn-secondary cancel-button" data-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary action-button" type="button" id="saveModifers" data-action="adjustRequirements" data-method="save" disabled>
+                        <span class="submit-label">Save</span>
+                        <div class="submitted-label" style="display: none">
                             <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                             <span class="sr-only">Saving...</span>
                             <span> Saving...</span>

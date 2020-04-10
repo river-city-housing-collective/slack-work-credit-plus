@@ -1,5 +1,12 @@
 <?php
-require_once('getData.php');
+require_once($_SERVER['DOCUMENT_ROOT'] . '/functions.php');
+
+// page is only accessible if authorized via slack
+// $slack is available for additional API calls
+$slack = signInWithSlack($conn);
+
+$reportData = $slack->getWorkCreditData();
+
 ?>
 
 <script>
@@ -11,12 +18,12 @@ require_once('getData.php');
         let classes = [];
 
         // enable select filter for categorical columns
-        if (['real_name', 'name'].includes(this['key'])) {
+        if (['real_name', 'name', 'other_req'].includes(this['key'])) {
             classes.push('filter-select');
         }
 
         // make name and description wider
-        if (['real_name', 'name', 'description'].includes(this['key'])) {
+        if (['real_name', 'name', 'description', 'other_req'].includes(this['key'])) {
             classes.push('credit-' + this['key'] + '-column');
         }
 
@@ -26,18 +33,19 @@ require_once('getData.php');
     data['userInfo'] = userInfo;
 </script>
 
+<!doctype html>
 <html>
 <head>
     <title>Work Credit Report</title>
 
     <!-- BootstrapVue CSS -->
-    <link type="text/css" rel="stylesheet" href="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.css" />
+    <link type="text/css" rel="stylesheet" href="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.css" />
 
     <!-- Load polyfills to support older browsers -->
     <script src="//polyfill.io/v3/polyfill.min.js?features=es2015%2CIntersectionObserver" crossorigin="anonymous"></script>
 
     <!-- Load Vue followed by BootstrapVue -->
-    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.11"></script>
+    <script src="//unpkg.com/vue@latest/dist/vue.min.js"></script>
     <script src="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
 
     <!-- Load the following for BootstrapVueIcons support -->
@@ -58,9 +66,6 @@ require_once('getData.php');
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tablesorter@2.31.3/dist/css/jquery.tablesorter.pager.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/extras/jquery.tablesorter.pager.min.js"></script>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sugar/2.0.6/sugar.min.js" integrity="sha256-5AA1KsUNzfgrGh3+JagBdys+ArLrYa9Q2JkKfPioAS8=" crossorigin="anonymous"></script>
-
-    <link href="/style.css" rel="stylesheet">
     <script src="/members-only/work-credit/work-credit.js"></script>
 
 
@@ -72,7 +77,6 @@ require_once('getData.php');
     <meta name="apple-mobile-web-app-title" content="Work Credit">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
     <button class="btn btn-info portal-back"><i class="fas fa-arrow-left"></i> Back to Portal</button>
@@ -84,20 +88,11 @@ require_once('getData.php');
             <div id="title">
                 <h3>Work Credit Report</h3>
             </div>
-            <ul class="nav nav-pills justify-content-center" id="pills-tab" role="tablist">
-                <li>
-                    <a class="nav-item nav-link active" data-toggle="pill" href="#report" id="report-tab" role="tab" aria-controls="report" aria-selected="true">Current Hours</a>
-                </li>
-                <!-- <li>
-                    <a class="nav-item nav-link" data-toggle="pill" href="#dashboard" id="dashboard-tab" role="tab" aria-controls="dashboard" aria-selected="false">Personal Dashboard</a>
-                </li> -->
-                <li>
-                    <a class="nav-item nav-link" data-toggle="pill" href="#submissions" id="submissions-tab" role="tab" aria-controls="submissions" aria-selected="false">Submission History</a>
-                </li>
-                <li>
-                    <a class="nav-item nav-link btn-success" href="" id="submit-tab" role="tab" data-target="#submitTimeModal" data-toggle="modal" data-backdrop="static" data-keyboard="false">Submit Time</a>
-                </li>
-            </ul>
+            <nav class="nav nav-pills justify-content-center" id="pills-tab" role="tablist">
+                <a class="nav-item nav-link active" data-toggle="pill" href="#report" id="report-tab" role="tab" aria-controls="report" aria-selected="true">Current Hours</a>
+                <a class="nav-item nav-link" data-toggle="pill" href="#submissions" id="submissions-tab" role="tab" aria-controls="submissions" aria-selected="false">Submission History</a>
+                <a class="nav-item nav-link btn-success" href="" id="submit-tab" role="tab" data-target="#submitTimeModal" data-toggle="modal" data-backdrop="static" data-keyboard="false">Submit Time</a>
+            </nav>
         </div> 
         <div class="tab-content" id="pills-tabContent">
             <div id="report" class="tab-pane fade show active" role="tabpanel" aria-labelledby="report-tab">
@@ -111,88 +106,49 @@ require_once('getData.php');
                             </h5>
                         </div>
                         <div v-bind:id="'collapse' + index" class="collapse show" v-bind:aria-labelledby="'header' + index">
-                            <div class="card-body desktop-only">    
+                            <div class="card-body">
                                 <template>
-                                    <div>
-                                        <b-table
-                                            striped
-                                            head-variant="primary"
-                                            fixed
-                                            responsive
-                                            :items="members['items'][key]"
-                                            :fields="members['fields']"
-                                            :tbody-tr-class="rowClass"
-                                        >
-                                            <template v-slot:cell(real_name)="data">
-                                                <span :class="styleUser(data.item.real_name)">{{ data.item.real_name }}</span>
-                                            </template>
-                                            <template v-slot:cell(room)="data">
-                                                <span :class="styleUser(data.item.real_name)">{{ data.item.room }}</span>
-                                            </template>
-                                            <template v-slot:cell(house_hours)="data">
-                                                <div v-if="data.item.next_debit_qty[1]">
-                                                    <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[1] }} / {{ data.item.next_debit_qty[1] }}</span>
-                                                </div>
-                                                <div v-else>
-                                                    <span>N/A</span>
-                                                </div>
-                                            </template>
-                                            <template v-slot:cell(collective_hours)="data">
-                                                <div v-if="data.item.next_debit_qty[2]">
-                                                    <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[2] }} / {{ data.item.next_debit_qty[2] }}</span>
-                                                </div>
-                                                <div v-else>
-                                                    <span>N/A</span>
-                                                </div>
-                                            </template>
-                                            <template v-slot:cell(maintenance_hours)="data">
-                                                <div v-if="data.item.next_debit_qty[3]">
-                                                    <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[3] }} / {{ data.item.next_debit_qty[3] }}</span>
-                                                </div>
-                                                <div v-else>
-                                                    <span>N/A</span>
-                                                </div>
-                                            </template>
-                                        </b-table>
-                                    </div>
-                                </template>
-                            </div>
-                            <div class="card-body mobile-only mobile-full-width">    
-                                <template>
-                                    <div>
-                                        <b-table
-                                            striped
-                                            head-variant="primary"
-                                            responsive
-                                            stacked
-                                            :items="members['items'][key]"
-                                            :fields="members['mobileFields']"
-                                            :tbody-tr-class="rowClass"
-                                        >
-                                            <template v-slot:cell(real_name)="data">
-                                                <span :class="styleUser(data.item.real_name)">{{ data.item.real_name }}</span>
-                                            </template>
-                                            <template v-slot:cell(room)="data">
-                                                <span :class="styleUser(data.item.real_name)">{{ data.item.room }}</span>
-                                            </template>
-                                            <template v-slot:cell(hours)="data">
-                                                <div style="display:inline-block" :class="styleUser(data.item.real_name)">
-                                                    <div v-if="data.item.next_debit_qty[3]" class="mobile-hours-cell" :class="'table-' + data.item._cellVariants.maintenance_hours">
-                                                        <p>&#128736;</p>
-                                                        {{ data.item.hours_credited[3] }} / {{ data.item.next_debit_qty[3] }}
-                                                    </div>
-                                                    <div v-if="data.item.next_debit_qty[2]" class="mobile-hours-cell" :class="'table-' + data.item._cellVariants.collective_hours">
-                                                        <p>&#10024;</p>
-                                                        {{ data.item.hours_credited[2] }} / {{ data.item.next_debit_qty[2] }}
-                                                    </div>
-                                                    <div v-if="data.item.next_debit_qty[1]" class="mobile-hours-cell" :class="'table-' + data.item._cellVariants.house_hours">
-                                                        <p>&#127968;</p>
-                                                        {{ data.item.hours_credited[1] }} / {{ data.item.next_debit_qty[1] }}
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </b-table>
-                                    </div>
+                                    <b-table-lite
+                                        striped
+                                        head-variant="primary"
+                                        fixed
+                                        stacked="md"
+                                        responsive
+                                        :items="members['items'][key]"
+                                        :fields="members['fields']"
+                                        :tbody-tr-class="rowClass"
+                                    >
+                                        <template v-slot:cell(real_name)="data">
+                                            <span :class="styleUser(data.item.real_name)">{{ data.item.real_name }}</span>
+                                        </template>
+                                        <template v-slot:cell(room)="data">
+                                            <span :class="styleUser(data.item.real_name)">{{ data.item.room }}</span>
+                                        </template>
+                                        <template v-slot:cell(house_hours)="data">
+                                            <div v-if="data.item.next_debit_qty[1]">
+                                                <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[1] }} / {{ data.item.next_debit_qty[1] }}</span>
+                                            </div>
+                                            <div v-else>
+                                                <span>N/A</span>
+                                            </div>
+                                        </template>
+                                        <template v-slot:cell(collective_hours)="data">
+                                            <div v-if="data.item.next_debit_qty[2]">
+                                                <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[2] }} / {{ data.item.next_debit_qty[2] }}</span>
+                                            </div>
+                                            <div v-else>
+                                                <span>N/A</span>
+                                            </div>
+                                        </template>
+                                        <template v-slot:cell(maintenance_hours)="data">
+                                            <div v-if="data.item.next_debit_qty[3]">
+                                                <span :class="styleUser(data.item.real_name)">{{ data.item.hours_credited[3] }} / {{ data.item.next_debit_qty[3] }}</span>
+                                            </div>
+                                            <div v-else>
+                                                <span>N/A</span>
+                                            </div>
+                                        </template>
+                                    </b-table-lite>
                                 </template>
                             </div>
                         </div>
@@ -241,12 +197,12 @@ require_once('getData.php');
                 <!-- pager -->
                 <div id="pager" class="pager">
                     <form>
-                        <img src="first.png" class="first"/>
-                        <img src="prev.png" class="prev"/>
+                        <img src="/resources/tablesorter/first.png" class="first"/>
+                        <img src="/resources/tablesorter/prev.png" class="prev"/>
                         <!-- the "pagedisplay" can be any element, including an input -->
                         <span class="pagedisplay" data-pager-output-filtered="{startRow:input} &ndash; {endRow} / {filteredRows} of {totalRows} total rows"></span>
-                        <img src="next.png" class="next"/>
-                        <img src="last.png" class="last"/>
+                        <img src="/resources/tablesorter/next.png" class="next"/>
+                        <img src="/resources/tablesorter/last.png" class="last"/>
                         <select class="pagesize">
                             <option value="10">10</option>
                             <option value="20">20</option>
@@ -265,6 +221,10 @@ require_once('getData.php');
                         >
                         </b-table-lite>
                     </div>
+                    </table>
+                    <div style="display: none">
+                        Sum of Hours: <span class="total"></span>
+                    </div>
                 </template>
                 <h4 v-else style="text-align: center">No submissions found.</h4>
             </div>
@@ -278,7 +238,7 @@ require_once('getData.php');
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
-                    <form id="submissionForm">
+                    <form class="modal-form">
                         <div class="modal-body">
                             <label for="hour_type_id" class="submission-label">Type of Hours:</label>
                             <div class="form-group">
@@ -290,14 +250,14 @@ require_once('getData.php');
                                     <p><small class="text-muted">e.g. cooking, cleaning</small></p>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="hour_type_id" id="hour_type_id_2" value="2" :disabled="userInfo['is_boarder'] == 1">
+                                    <input class="form-check-input" type="radio" name="hour_type_id" id="hour_type_id_2" value="2">
                                     <label class="form-check-label" for="hour_type_id_2">
                                         &#10024; Collective
                                     </label>
                                     <p><small class="text-muted">e.g. committee meetings, community outreach</small></p>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="hour_type_id" id="hour_type_id_3" value="3" :disabled="userInfo['is_boarder'] == 1">
+                                    <input class="form-check-input" type="radio" name="hour_type_id" id="hour_type_id_3" value="3">
                                     <label class="form-check-label" for="hour_type_id_3">
                                         &#128736; Maintenance
                                     </label>

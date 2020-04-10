@@ -8,7 +8,7 @@
 
 <script src="https://kit.fontawesome.com/b1d2b46db4.js" crossorigin="anonymous"></script>
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
 <link rel="stylesheet" href="/style.css">
 

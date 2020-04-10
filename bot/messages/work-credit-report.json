@@ -1,0 +1,49 @@
+{
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "Here's your personal work credit report for *April 2020*!"
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": ""
+      }
+    },
+    {
+      "type": "divider"
+    },
+    {
+      "type": "actions",
+      "elements": [
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "emoji": true,
+            "text": "Submit Time"
+          },
+          "style": "primary",
+          "value": "submit_time"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "emoji": true,
+            "text": "View Submissions"
+          },
+          "url": "https://rchc.coop/members-only/work-credit#submissions",
+          "value": "view_submissions"
+        }
+      ]
+    }
+  ]
+}

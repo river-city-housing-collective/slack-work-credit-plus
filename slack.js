@@ -9,7 +9,7 @@ $(function () {
 
         let alertClass = '';
 
-        switch(userInfo.house) {
+        switch(userInfo.house) { //todo generalize
             case 'Anomy':
                 alertClass = 'alert-danger';
                 break;
@@ -26,9 +26,28 @@ $(function () {
 
     $('.portal-back').click(function() {
         window.location = "/members-only/";
-    })
+    });
 
     $('#logout').click(function() {
         window.location = "/members-only/logout.php";
-    })
+    });
 });
+
+function updateFormState($form, disabled, submit = false) {
+    let data = false;
+
+    if (submit) {
+        data = $form.serialize();
+
+        $form.find(".submit-label").hide();
+        $form.find(".submitted-label").show();
+    }
+    else {
+        $form.find(".submit-label").show();
+        $form.find(".submitted-label").hide();
+    }
+
+    $form.find('input, select, button').prop('disabled', disabled);
+
+    return data;
+}

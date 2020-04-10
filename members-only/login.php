@@ -14,8 +14,7 @@
     <hr class="my-4">
     <p class="lead">
         <div class="login">
-            <button type="button" class="btn btn-primary btn-lg mobile-only"><i class="fab fa-slack"></i> Sign in with Slack</button>
-            <button type="button" class="btn btn-primary btn-lg desktop-only"><i class="fab fa-slack"></i> Sign in with Slack</button>
+            <button type="button" class="btn btn-primary btn-lg"><i class="fab fa-slack"></i> Sign in with Slack</button>
         </div>
     </p>
 </div>

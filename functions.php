@@ -187,6 +187,14 @@ class Slack {
             'details' => 's',
             'initiated_by_cron' => 'i'
         ),
+        'sl_houses' => array(
+            'slack_group_id' => 's',
+            'name' => 's',
+            'slack_handle' => 's',
+            'slack_channel_id' => 's',
+            'door_code' => 'i',
+            'door_code_length' => 'i'
+        ),
         'sl_users' => array(
             'slack_user_id' => 's',
             'real_name' => 's',
@@ -291,7 +299,7 @@ class Slack {
                 'avatar' => $slackUserInfo['image_72'],
                 'house' => $additionalUserDetails['name'],
                 'type' => implode('/', $roles),
-                'is_boarder' => $additionalUserDetails['is_boarder'],
+                'is_boarder' => $this->admin ? 0 : $additionalUserDetails['is_boarder'], // override boarder restrictions if admin
                 'is_guest' => $additionalUserDetails['is_guest']
             );
         }
@@ -515,8 +523,10 @@ class Slack {
         }
     }
 
-    public function importSlackUsersToDb() {
-        $users = $this->apiCall('users.list')['members'];
+    public function importSlackUsersToDb($users = null) {
+        if (!isset($users)) {
+            $users = $this->apiCall('users.list')['members'];
+        }
 
         $sql = 'insert into sl_users (
             slack_user_id,
@@ -662,6 +672,267 @@ class Slack {
         $viewJson = $this->setInputValues($viewJson, $profileData);
 
         return $viewJson;
+    }
+
+    public function buildWorkCreditModal($profileData) {
+        $user_id = 'UPC9446BB';
+        $view = 'work-credit-warning';
+
+        $workCreditCheck = $this->sqlSelect("
+                select * from wc_time_debits
+                where slack_user_id = '$user_id'
+                order by date_effective desc limit 1
+            ");
+
+        if ($workCreditCheck) {
+            $view = 'submit-time-modal';
+        }
+
+        $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
+
+        if ($view == 'submit-time-modal' && !$profileData['is_boarder']) {
+            $otherReqsQuestion = json_decode(file_get_contents('views/time-resident-addon.json'), TRUE);
+            array_push($viewJson['blocks'], $otherReqsQuestion);
+        }
+
+        return $viewJson;
+    }
+
+    public function getWorkCreditData($user_id = null) {
+        // build query to get hour counts
+        $hourTypes = $this->sqlSelect('select * from wc_lookup_hour_types');
+        $hourFields = array(
+            'hours_credited' => 'wc_time_credits',
+            'hours_debited' => 'wc_time_debits'
+        );
+
+        foreach($hourTypes as $type) {
+            $label = $type['name'];
+
+            $reportData['hourTypesLookup'][$type['id']] = $label;;
+
+            $combinedFields[] = array(
+                'key' => strtolower($label) . '_hours',
+                'label' => $label
+            );
+
+            foreach($hourFields as $field => $table) {
+                $id = $type['id'];
+                $newField = $field . '_' . $id;
+
+                // get lifetime credit/debit totals
+                $hourSubQueries[] = "
+                    (select
+                        sum(case when hour_type_id = $id
+                            then $field
+                            else 0 end)
+                        from $table
+                        where slack_user_id = u.slack_user_id
+                    ) as '$newField'
+                ";
+
+                if ($table == 'wc_time_debits') {
+                    $newField = 'next_debit_qty' . '_' . $id;
+
+                    // get most recent hours due
+                    $hourSubQueries[] = "
+                        (select
+                            $field
+                            from $table
+                            where slack_user_id = u.slack_user_id
+                            and hour_type_id = $id
+                            order by date_effective desc limit 1
+                        ) as '$newField'
+                    ";
+                }
+            }
+        }
+
+        $hourSubQueries = implode(', ', $hourSubQueries);
+
+        $sql = "
+            select
+                u.slack_user_id,
+                u.real_name,
+                h.name as 'house',
+                case when r.room is null
+                    then 'Boarder'
+                    else r.room end
+                as 'room',
+                $hourSubQueries
+            from sl_users u
+            left join sl_houses as h on h.slack_group_id = u.house_id
+            left join sl_rooms as r on r.id = u.room_id and r.house_id = u.house_id
+            where u.deleted <> 1 and u.is_guest <> 1 and u.house_id is not null
+        ";
+
+        if (isset($user_id)) {
+            $sql .= " and u.slack_user_id = '$user_id'";
+        }
+
+        $sql .= " group by u.slack_user_id
+            order by h.name, isnull(r.id), r.id, u.real_name
+        ";
+
+        // get user info (w/ hours)
+        $memberData = $this->sqlSelect($sql, null, true);
+
+        $hourFields = array_keys($hourFields);
+
+        foreach($memberData as $data) {
+            $house = $data['house'];
+            unset($data['house']);
+
+            foreach($hourTypes as $type) {
+                $hourTypeId = $type['id'];
+                $hourTypeLabel = $type['name'];
+
+                $creditField = $hourFields[0];
+                $debitField = $hourFields[1];
+                $nextDebitField = 'next_debit_qty';
+
+                $oldCreditField = $creditField . '_' . $hourTypeId;
+                $oldDebitField = $debitField . '_' . $hourTypeId;
+                $oldNextDebitField = $nextDebitField . '_' . $hourTypeId;
+
+                $cellStyle = '';
+
+                $combinedField = strtolower($hourTypeLabel) . '_hours';
+
+                if (!$data[$oldNextDebitField]) {
+                    $data['_cellVariants'][$combinedField] = '';
+                }
+
+                // subtract total debits from earned hours
+                $hoursDiff = $data[$oldCreditField] - $data[$oldDebitField];
+
+                if ($hoursDiff != 0) {
+                    $data[$creditField][$hourTypeId] = $data[$oldNextDebitField] + $hoursDiff;
+                }
+
+                // strip empty decimal places
+                $data[$nextDebitField][$hourTypeId] = floatval($data[$oldNextDebitField]);
+
+                if (isset($data[$creditField][$hourTypeId]) && $hoursDiff >= 0) {
+                    $cellStyle = 'positive';
+                }
+                else if ($hoursDiff < -$data[$oldNextDebitField]) {
+                    $cellStyle = 'negative';
+                }
+
+                $data['_cellVariants'][$combinedField] = $cellStyle;
+
+                unset($data[$oldNextDebitField]);
+                unset($data[$oldDebitField]);
+                unset($data[$oldCreditField]);
+            }
+
+            unset($data['slack_user_id']);
+
+            if ($data['real_name'] == $this->userInfo['real_name']) {
+                $reportData['userRecord'] = $data;
+            }
+
+            if (isset($user_id)) {
+                $formattedHourTypes = array();
+
+                foreach ($hourTypes as $type) {
+                    $formattedHourTypes[$type['id']] = $type;
+                }
+
+                return array(
+                    'userData' => $data,
+                    'hourTypes' => $formattedHourTypes
+                );
+            }
+            else {
+                $groupedMemberData[$house][] = $data;
+            }
+        }
+
+        $reportData['members']['items'] = $groupedMemberData;
+
+        $fields = array(
+            array(
+                'key' => 'real_name',
+                'label' => 'Name'
+            ),
+            array(
+                'key' => 'room',
+                'label' => 'Room'
+            )
+        );
+
+        $reportData['members']['fields'] = array_merge($fields, $combinedFields);
+        $reportData['members']['mobileFields'] = array_merge($fields, array(array('key' => 'hours')));
+
+        $reportData['currentPage'] = 1;
+        $reportData['perPage'] = 3;
+
+        // get time records
+        $submissionData = $this->sqlSelect("
+            select
+                tc.timestamp,
+                u.real_name,
+                tc.hours_credited,
+                lht.name,
+                tc.contribution_date,
+                tc.description,
+                lort.name as 'other_req'
+            from wc_time_credits as tc
+            left join sl_users as u on u.slack_user_id = tc.slack_user_id
+            left join wc_lookup_hour_types as lht on lht.id = tc.hour_type_id
+            left join wc_lookup_other_req_types as lort on lort.id = tc.other_req_id
+            order by tc.id desc
+        ", null, true);
+
+        //todo cst timezone
+        //todo 12 hour format
+
+        if ($submissionData) {
+            $fields = array(
+                array(
+                    'key' => 'timestamp',
+                    'label' => 'Timestamp'
+                ),
+                array(
+                    'key' => 'real_name',
+                    'label' => 'Member'
+                ),
+                array(
+                    'key' => 'hours_credited',
+                    'label' => 'Hours'
+                ),
+                array(
+                    'key' => 'name', // todo db fields could use some refactoring
+                    'label' => 'Type'
+                ),
+                array(
+                    'key' => 'contribution_date',
+                    'label' => 'Date of Contribution'
+                ),
+                array(
+                    'key' => 'description',
+                    'label' => 'Description of Work Completed'
+                ),
+                array(
+                    'key' => 'other_req',
+                    'label' => 'Requirement Met'
+                )
+            );
+
+            $reportData['submissions'] = array(
+                'fields' => $fields,
+                'items' => $submissionData,
+                'currentPage' => 1,
+                'perPage' => 50
+            );
+        }
+        else {
+            $reportData['submissions'] = false;
+        }
+
+        return $reportData;
     }
 
     public function getOptions($table, $filter = null) {

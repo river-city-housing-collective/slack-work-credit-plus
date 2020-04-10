@@ -2,7 +2,6 @@
 
 header('Content-Type: application/json');
 
-require_once('../dbconnect.php');
 require_once('../functions.php');
 
 // create new slack object with bot token
@@ -35,9 +34,10 @@ if ($type == 'app_home_opened') {
         'bot'
     );
 }
-// todo only update single user
+// todo test
 else if ($type = 'user_change') {
-    $slack->importSlackUsersToDb();
+    $userData = $eventPayload['user'];
+    $slack->importSlackUsersToDb(array($userData));
 }
 
 //todo cron reminders to submit hours at end of month

@@ -91,22 +91,16 @@ $( document ).ready(function() {
         }
     });
 
-    $('#submissionForm').validate();
+    let $form = $('#submitTimeModal modal-form');
 
-    // todo does not validate
+    $form.validate();
+
     $("#submitHours").click(function(e){
         if (!$('#submissionForm').valid()) {
             return;
         }
 
-        let data = $('#submissionForm').serialize();
-
-        $("#submissionForm :input").prop("disabled", true);
-        $("#submitHours").prop("disabled", true);
-        $("#cancelSubmit").prop("disabled", true);
-
-        $("#submitText").hide();
-        $("#submitted").show();
+        let data = updateFormState($form, true, true);
 
         $.ajax({
             type: "POST",
@@ -114,7 +108,7 @@ $( document ).ready(function() {
             cache: false,
             data: data,
             success: function(response) {
-                if (response == 1) {
+                if (response === 1) {
                     localStorage.setItem('success', true);
                     location.reload();
                 }
@@ -140,8 +134,6 @@ $( document ).ready(function() {
             $('#' + id).removeClass('show');
         }
     });
-
-    $('')
 
     $('#reportAccordion').on('shown.bs.collapse', function (e) {
         localStorage.setItem(e.target.id, true);
@@ -233,59 +225,77 @@ $( document ).ready(function() {
 
     };
 
-    $("#submissionsTable").tablesorter({
-        theme: 'bootstrap',
-        widgets: [ "filter", "columns", "zebra", "editable" ],
-        columns: [ "primary", "secondary", "tertiary" ],
-        widgetOptions: {
-            editable_columns       : [0,1,2],       // or "0-2" (v2.14.2); point to the columns to make editable (zero-based index)
-            editable_enterToAccept : true,          // press enter to accept content, or click outside if false
-            editable_autoAccept    : true,          // accepts any changes made to the table cell automatically (v2.17.6)
-            editable_autoResort    : false,         // auto resort after the content has changed.
-            editable_validate      : null,          // return a valid string: function(text, original, columnIndex) { return text; }
-            editable_focused       : function(txt, columnIndex, $element) {
-                // $element is the div, not the td
-                // to get the td, use $element.closest('td')
-                $element.addClass('focused');
-            },
-            editable_blur          : function(txt, columnIndex, $element) {
-                // $element is the div, not the td
-                // to get the td, use $element.closest('td')
-                $element.removeClass('focused');
-            },
-            editable_selectAll     : function(txt, columnIndex, $element) {
-                // note $element is the div inside of the table cell, so use $element.closest('td') to get the cell
-                // only select everthing within the element when the content starts with the letter "B"
-                return /^b/i.test(txt) && columnIndex === 0;
-            },
-            editable_wrapContent   : '<div>',       // wrap all editable cell content... makes this widget work in IE, and with autocomplete
-            editable_trimContent   : true,          // trim content ( removes outer tabs & carriage returns )
-            editable_noEdit        : 'no-edit',     // class name of cell that is not editable
-            editable_editComplete  : 'editComplete' // event fired after the table content has been edited
-        },
-        filter_functions: {
+    $submissionsTable = $("#submissionsTable");
 
-            // Add select menu to this column
-            // set the column value to true, and/or add "filter-select" class name to header
-            // '.first-name' : true,
+    $submissionsTable
+        .tablesorter({
+            theme: 'bootstrap',
+            widgets: [ "filter", "columns", "zebra" ],
+            columns: [ "primary", "secondary", "tertiary" ],
+            filter_functions: {
 
-            // Exact match only
-            1 : function(e, n, f, i, $r, c, data) {
-                return e === f;
+                // Add select menu to this column
+                // set the column value to true, and/or add "filter-select" class name to header
+                // '.first-name' : true,
+
+                // Exact match only
+                1 : function(e, n, f, i, $r, c, data) {
+                    return e === f;
+                }
             }
-        }
-    })
+        })
         // bind to pager events
         // *********************
-        .bind('pagerChange pagerComplete pagerInitialized pageMoved', function(e, c) {
-            var msg = '"</span> event triggered, ' + (e.type === 'pagerChange' ? 'going to' : 'now on') +
-                ' page <span class="typ">' + (c.page + 1) + '/' + c.totalPages + '</span>';
-            $('#display')
-                .append('<li><span class="str">"' + e.type + msg + '</li>')
-                .find('li:first').remove();
+        // .bind('pagerChange pagerComplete pagerInitialized pageMoved', function(e, c) {
+        //     var msg = '"</span> event triggered, ' + (e.type === 'pagerChange' ? 'going to' : 'now on') +
+        //         ' page <span class="typ">' + (c.page + 1) + '/' + c.totalPages + '</span>';
+        //     $('#display')
+        //         .append('<li><span class="str">"' + e.type + msg + '</li>')
+        //         .find('li:first').remove();
+        // })
+        .bind('filterEnd', function(e, filter) {
+            console.log(filter);
         })
-
         // initialize the pager plugin
         // ****************************
-        .tablesorterPager(pagerOptions);
+        .tablesorterPager(pagerOptions)
+        .delegate('button.remove', 'click' ,function() {
+            var t = $submissionsTable;
+            // disabling the pager will restore all table rows
+            // t.trigger('disablePager');
+            // remove chosen row
+            $(this).closest('tr').remove();
+            // restore pager
+            // t.trigger('enablePager');
+            t.trigger('update');
+            return false;
+        });
+
+
+    // Javascript to enable link to tab
+    var url = document.location.toString();
+    console.log('.nav-pills a[href="#' + url.split('#')[1] + '"]');
+    if (url.match('#')) {
+        $('.nav-pills a[href="#' + url.split('#')[1] + '"]').tab('show');
+    }
+
+    // Change hash for page-reload
+    $('.nav-pills a').on('shown.bs.tab', function (e) {
+        window.location.hash = e.target.hash;
+    });
 });
+
+function loadExistingRecord(item) {
+    let $modal = $('#submitTimeModal');
+
+    $.each(item, function (key, value) {
+        $field = $modal.find('[name=' + key + ']');
+
+        if (key === 'hour_type_id') {
+            $field.find('[value=' + value + ']').prop("checked",true);
+        }
+        else {
+            $field.val(value);
+        }
+    });
+}

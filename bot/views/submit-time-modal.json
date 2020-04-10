@@ -104,7 +104,7 @@
 				"type": "datepicker",
 				"placeholder": {
 					"type": "plain_text",
-					"text": " ",
+					"text": "Select Date",
 					"emoji": true
 				},
 				"action_id": "value"
