@@ -22,65 +22,6 @@ function debug($value, $compact = null) {
     echo "\r\n" . '~START~ ' . "\r\n" . $value . "\r\n" . ' ~END~' . "\r\n";
 }
 
-function email($toAddresses, $subject, $body, $ccAddresses = null) {
-    $config = parse_ini_file(
-        $_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1' ?
-            'config.ini' :
-            '/home/isaneu/private/config.ini'
-    );
-
-    $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
-
-    try {
-        //Server settings
-//        $mail->SMTPDebug = 2;                                 // Enable verbose debug output
-        $mail->isSMTP();                                      // Set mailer to use SMTP
-        $mail->Host = $config['smtp_host'];                   // Specify main and backup SMTP servers
-        $mail->SMTPAuth = true;                               // Enable SMTP authentication
-        $mail->Username = $config['smtp_email'];              // SMTP username
-        $mail->Password = $config['smtp_password'];           // SMTP password
-        $mail->SMTPSecure = 'tls';                            // Enable TLS encryption, `ssl` also accepted
-        $mail->Port = 587;                                    // TCP port to connect to
-
-        //Recipients
-        $mail->setFrom($config['smtp_email'], $config['smtp_username']);          //This is the email your form sends From
-
-        if (!is_array($toAddresses)) {
-            $toAddresses = array($toAddresses);
-        }
-
-        foreach ($toAddresses as $address) {
-            $mail->addAddress($address); // Add a recipient address
-        }
-
-//        if (isset($ccAddresses)) {
-//            foreach ($ccAddresses as $address) {
-//                $mail->addCC($address);
-//            }
-//        }
-
-        //$mail->addAddress('contact@example.com');               // Name is optional
-        //$mail->addReplyTo('info@example.com', 'Information');
-        //$mail->addBCC('bcc@example.com');
-
-        //Attachments
-        //$mail->addAttachment('/var/tmp/file.tar.gz');         // Add attachments
-        //$mail->addAttachment('/tmp/image.jpg', 'new.jpg');    // Optional name
-
-        //Content
-//        $mail->isHTML(true);                                  // Set email format to HTML
-        $mail->Subject = $subject;
-        $mail->Body    = $body;
-        //$mail->AltBody = 'This is the body in plain text for non-HTML mail clients';
-
-        $mail->send();
-//        echo 'Message has been sent';
-    } catch (Exception $e) {
-        echo 'Message could not be sent.';
-        echo 'Mailer Error: ' . $mail->ErrorInfo;
-    }
-}
-
 function getSlackConfig($conn) {
     // get config from db
     $sql = "SELECT * FROM sl_config";
@@ -465,6 +406,68 @@ class Slack {
         return $stmt->affected_rows;
     }
 
+    public function email($toAddresses, $subject, $body, $ccAddresses = null) {
+        $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
+        $config = parse_ini_file(
+            $_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1' ?
+                'config.ini' :
+                '/home/isaneu/private/config.ini'
+        );
+
+        try {
+            //Server settings
+//        $mail->SMTPDebug = 2;                                 // Enable verbose debug output
+            $mail->isSMTP();                                      // Set mailer to use SMTP
+            $mail->Host = $config['smtp_host'];                   // Specify main and backup SMTP servers
+            $mail->SMTPAuth = true;                               // Enable SMTP authentication
+            $mail->Username = $config['smtp_email'];              // SMTP username
+            $mail->Password = $config['smtp_password'];           // SMTP password
+            $mail->SMTPSecure = 'tls';                            // Enable TLS encryption, `ssl` also accepted
+            $mail->Port = 587;                                    // TCP port to connect to
+
+            //Recipients
+            $mail->setFrom($config['smtp_email'], $config['smtp_username']);          //This is the email your form sends From
+
+            if (!is_array($toAddresses)) {
+                $toAddresses = array($toAddresses);
+            }
+
+            foreach ($toAddresses as $address) {
+                $mail->addAddress($address); // Add a recipient address
+            }
+
+//        if (isset($ccAddresses)) {
+//            foreach ($ccAddresses as $address) {
+//                $mail->addCC($address);
+//            }
+//        }
+
+            //$mail->addAddress('contact@example.com');               // Name is optional
+            //$mail->addReplyTo('info@example.com', 'Information');
+            //$mail->addBCC('bcc@example.com');
+
+            //Attachments
+            //$mail->addAttachment('/var/tmp/file.tar.gz');         // Add attachments
+            //$mail->addAttachment('/tmp/image.jpg', 'new.jpg');    // Optional name
+
+            //Content
+//        $mail->isHTML(true);                                  // Set email format to HTML
+            $mail->Subject = $subject;
+            $mail->Body    = $body;
+            //$mail->AltBody = 'This is the body in plain text for non-HTML mail clients';
+
+            $mail->send();
+//        echo 'Message has been sent';
+
+        } catch (Exception $e) {
+            $this->sqlInsert('event_logs', array(
+                'slack_user_id' => isset($this->userId) ? $this->userId : null,
+                'event_type' => 'emailError',
+                'details' => 'Message could not be sent. Mailer Error: ' . $mail->ErrorInfo
+            ));
+        }
+    }
+
     public function addToUsergroup($user_id, $usergroup_id) {
         // get current list of users
         $users = $this->apiCall(
@@ -578,7 +581,7 @@ class Slack {
     }
 
     // todo more testing with new email function
-    public function sendEmail($fromUserId, $subject, $body, $house_id, $reallySend = false) {
+    public function emailCommunity($fromUserId, $subject, $body, $house_id, $reallySend = false) {
         $sql = "
             select
                 slack_user_id,
@@ -616,20 +619,17 @@ class Slack {
         // make sure author is included in email
         $userEmails = array_unique(array_merge($userEmails, array($fromEmail)), SORT_REGULAR);
 
-        // note for bottom of email
-        $house = 'all current RCHC community members';
-
         // if house specific, get user readable name
-        if ($house_id) {
+        if ($house_id !== 'all') {
             $house = $this->sqlSelect("select name from sl_houses where slack_group_id = '$house_id'");
+
+            $recipientsStr = 'all residents and boarders of ' . $house;
         }
         else {
-            $house = 'RCHC';
+            $recipientsStr = 'all current RCHC community members'; //todo generalize
         }
 
-        $house = 'all residents and boarders of ' . $house;
-
-        $body .= "\r\n\r\n" . '[This message was sent on behalf of ' . $fromEmail . ' to ' . $house . ']';
+        $body .= "\r\n\r\n" . '[This message was sent on behalf of ' . $fromEmail . ' to ' . $recipientsStr . ']';
 
         // check if this is a legit send or if we're just testing
         if ($reallySend) {
@@ -642,14 +642,14 @@ class Slack {
             $subject = '[RCHC] ' . $subject;
         }
         else {
-            $toEmails = $adminEmails;
+            $toEmails = 'izneuhaus@gmail.com';
             $emailDump = implode("\r\n", $userEmails);
 
             $subject = '[RCHC EMAIL TEST] ' . $subject;
             $body .= "\r\n\r\n" . '---' . "\r\n" . "This email was intended for the following email addresses: " . "\r\n" . $emailDump;
         }
 
-        email($toEmails, $subject, $body, isset($cc) ? $cc : null);
+        $this->email($toEmails, $subject, $body, isset($cc) ? $cc : null);
     }
 
     public function buildProfileModal($profileData) {

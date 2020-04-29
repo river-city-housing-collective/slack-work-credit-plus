@@ -241,7 +241,7 @@ else if ($type == 'view_submission') {
     $inputValues = $slack->getInputValues($eventPayload['view']['state']['values']);
 
     if ($callback_id == 'send-email-modal') {
-        $slack->sendEmail($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id'], true);
+        $slack->emailCommunity($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id'], true);
     }
     else if ($callback_id == 'submit-time-modal') {
         $decimalCheck = $inputValues['hours_credited'] != 0.25 ? fmod($inputValues['hours_credited'], 0.25) != 0 : false;

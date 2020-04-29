@@ -41,7 +41,7 @@ switch($argv[1]) {
 //        }
 
         $logMsg = 'Successfully created hour debits for ' . sizeof($users) . ' members.';
-        email($slack->config['CRON_EMAIL'], 'Work Credit Hours Debit', $logMsg);
+        $slack->email($slack->config['CRON_EMAIL'], 'Work Credit Hours Debit', $logMsg);
 
         break;
     default:
