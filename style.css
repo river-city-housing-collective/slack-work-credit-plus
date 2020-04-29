@@ -147,9 +147,8 @@ th, td {
     white-space:nowrap;
 }
 
-/*todo overflow text*/
 .credit-description-column {
-    width: 30%;
+    width: 40%;
 }
 
 .hours-td {
@@ -167,8 +166,9 @@ th, td {
     padding-bottom: 3vw;
 }
 
-.nav-pills > li {
-    margin-left: 1vw;
+nav a {
+    display: inline;
+    margin-right: 0.5vw;
 }
 
 #submissionsView {
@@ -236,8 +236,38 @@ label {
     font-weight: bold;
 }
 
+#successAlert {
+    text-align: center;
+}
+
+#successAlert > .alert {
+    width: 50%;
+    display: inline-block;
+}
+
 .error {
     color: red;
+}
+
+table {
+    table-layout: fixed;
+}
+
+.delete-col {
+    width: 100px;
+}
+
+.hours-col {
+    width: 100px;
+}
+
+.description-col {
+    text-align: left;
+    white-space: normal;
+}
+
+.tablesorter .tablesorter-filter-row .disabled {
+    display: none;
 }
 
 /*admin tools*/

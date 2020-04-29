@@ -91,12 +91,12 @@ $( document ).ready(function() {
         }
     });
 
-    let $form = $('#submitTimeModal modal-form');
+    let $form = $('#submitTimeModal .modal-form');
 
     $form.validate();
 
     $("#submitHours").click(function(e){
-        if (!$('#submissionForm').valid()) {
+        if (!$form.valid()) {
             return;
         }
 
@@ -108,7 +108,7 @@ $( document ).ready(function() {
             cache: false,
             data: data,
             success: function(response) {
-                if (response === 1) {
+                if (response === '1') {
                     localStorage.setItem('success', true);
                     location.reload();
                 }
@@ -125,8 +125,6 @@ $( document ).ready(function() {
     // todo dashboard view
     // app.loadDashboard();
 
-    // todo anchors for linking directly to report/dashboard/history
-
     $('.collapse').each(function(index, collapse) {
         var id = $(collapse).get(0).id;
 
@@ -141,6 +139,38 @@ $( document ).ready(function() {
 
     $('#reportAccordion').on('hidden.bs.collapse', function (e) {
         localStorage.setItem(e.target.id, false);
+    });
+
+    $('.delete-record').click(function () {
+        let confirmed = confirm('Are you sure you want to delete this record?');
+
+        if (confirmed) {
+            $.ajax({
+                type: "POST",
+                url: "/ajax.php?action=deleteTimeRecord",
+                cache: false,
+                data: {
+                    'id': $(this).data('id')
+                },
+                success: function(response) {
+                    window.location.reload();
+                },
+                error: function(){
+                    alert("Something went wrong!");
+                }
+            });
+        }
+    });
+
+    $('#other_req_id').change(function () {
+        let descField = $('#descriptionDiv');
+
+        if ($(this).val() !== '') {
+            descField.hide();
+        }
+        else {
+            descField.show();
+        }
     });
 
     var pagerOptions = {
@@ -274,7 +304,6 @@ $( document ).ready(function() {
 
     // Javascript to enable link to tab
     var url = document.location.toString();
-    console.log('.nav-pills a[href="#' + url.split('#')[1] + '"]');
     if (url.match('#')) {
         $('.nav-pills a[href="#' + url.split('#')[1] + '"]').tab('show');
     }

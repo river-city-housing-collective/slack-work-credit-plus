@@ -197,6 +197,25 @@ else if ($type == 'block_actions') {
             }
         }
     }
+    // log hours view
+    else if ($callback_id == 'submit-time-modal') {
+        if ($actionKey == 'other_req_id' && $actionValue !== '0') {
+//            $viewJson = json_decode(file_get_contents('views/submit-time-modal.json'), TRUE);
+//            $viewJson['blocks'][0]['element']['options'] = $slack->getOptions('sl_rooms', $profileData['house_id']);
+//            $viewJson = $slack->setInputValues($viewJson, $profileData);
+
+            $viewJson = $slack->buildWorkCreditModal($profileData, true);
+
+            echo json_encode($slack->apiCall(
+                'views.update',
+                array(
+                    'view' => $viewJson,
+                    'view_id' => $view_id
+                ),
+                'bot'
+            ));
+        }
+    }
     // work credit /hours
     else if ($actionValue == 'submit_time') {
         $viewJson = $slack->buildWorkCreditModal($profileData);
@@ -222,8 +241,7 @@ else if ($type == 'view_submission') {
     $inputValues = $slack->getInputValues($eventPayload['view']['state']['values']);
 
     if ($callback_id == 'send-email-modal') {
-        // todo add true flag to enable for production
-        $slack->sendEmail($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id']);
+        $slack->sendEmail($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id'], true);
     }
     else if ($callback_id == 'submit-time-modal') {
         $decimalCheck = $inputValues['hours_credited'] != 0.25 ? fmod($inputValues['hours_credited'], 0.25) != 0 : false;

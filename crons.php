@@ -24,8 +24,8 @@ switch($argv[1]) {
                 $returnLabel = $slack->scheduleHoursDebit($user_id, 2);
 //                $results[] = $returnLabel;
 
-                // last month of the year - schedule maintenance hours for next
-                if (date('n') == 12 || $argv[2] == '-init') {
+                // start of new leasing period - schedule maintenance hours for next
+                if (date('n') == 8 || $argv[2] == '-init') {
                     $returnLabel = $slack->scheduleHoursDebit($user_id, 3);
 //                    $results[] = $returnLabel;
                 }
@@ -41,7 +41,7 @@ switch($argv[1]) {
 //        }
 
         $logMsg = 'Successfully created hour debits for ' . sizeof($users) . ' members.';
-        email('izneuhaus@gmail.com', 'RCHC Hours Debit', $logMsg);
+        email($slack->config['CRON_EMAIL'], 'Work Credit Hours Debit', $logMsg);
 
         break;
     default:

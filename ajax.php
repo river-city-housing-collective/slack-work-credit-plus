@@ -16,12 +16,8 @@ switch($action) {
         if ($method === 'save') {
             $slack->sqlInsert('sl_houses', $_POST);
 
-            // log event in db
-            $slack->sqlInsert('event_logs', array(
-                'slack_user_id' => $slack->userId,
-                'event_type' => $action,
-                'details' => 'Door code for ' . $_POST['slack_group_id'] . ' was changed'
-            ));
+            // event details for logging
+            $details = 'Door code for ' . $_POST['slack_group_id'] . ' was changed';
         }
         else {
             echo json_encode($slack->sqlSelect("select * from sl_houses order by name asc"));
@@ -34,7 +30,27 @@ switch($action) {
         break;
     case 'adjustRequirements':
         if ($method === 'save') {
-            echo json_encode($_POST);
+            $mods = array();
+            $categories = ['hour', 'other'];
+
+            foreach ($categories as $category) {
+                foreach ($_POST[$category . '_type_id'] as $index => $id) {
+                    $mods[] = array(
+                        'slack_user_id' => $_POST['user_id'],
+                        $category . '_type_id' => $id,
+                        'qty_modifier' => $_POST[$category . '_qty_modifier'][$index]
+                    );
+                }
+            }
+
+            foreach ($mods as $mod) {
+                $slack->sqlInsert('wc_user_req_modifiers', $mod);
+            }
+
+            // event details for logging
+            $details = "Updated Work Credit requirements for " . $_POST['user_id'];
+
+            echo json_encode($mods);
         }
         else if ($method === 'load_user') {
             $user_id = $_POST['user_id'];
@@ -91,4 +107,23 @@ switch($action) {
         }
 
         break;
+    case 'deleteTimeRecord':
+        $id = $_POST['id'];
+
+        $recordData = $slack->sqlSelect("select * from wc_time_credits where id = $id");
+        $details = json_encode($recordData);
+
+        $stmt = $slack->conn->prepare("delete from wc_time_credits where id = $id");
+        $stmt->execute();
+
+        break;
+}
+
+if (isset($details)) {
+    // log event in db
+    $slack->sqlInsert('event_logs', array(
+        'slack_user_id' => $slack->userId,
+        'event_type' => $action,
+        'details' => $details
+    ));
 }

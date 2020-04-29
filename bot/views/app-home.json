@@ -9,8 +9,8 @@
 				"text": "Hi! What can I help you with today?",
 				"emoji": true
 			},
-			"image_url": "https://cnet1.cbsistatic.com/img/qyvVFsmGS_gKN54BWgUcAME-K0g=/1092x0/2019/11/19/2eddb56d-56a3-4569-874e-32cd61180d6a/babyyoda2.jpg",
-			"alt_text": "Baby Yoda"
+			"image_url": "",
+			"alt_text": ""
 		},
 		{
 			"type": "divider"

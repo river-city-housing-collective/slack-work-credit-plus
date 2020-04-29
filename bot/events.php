@@ -23,20 +23,30 @@ $user_id = $eventPayload['user'];
 $type = $eventPayload['type'];
 
 if ($type == 'app_home_opened') {
-    $json = file_get_contents('views/app-home.json');
+    $json = json_decode(file_get_contents('views/app-home.json'), true);
+
+    // get image and bot name from config
+    $json['blocks'][0]['image_url'] = $slack->config['BOT_HOME_IMAGE']; //todo fix hotlinks
 
     echo $slack->apiCall(
         'views.publish',
         array(
             "user_id" => $user_id,
-            "view" => $json
+            "view" => json_encode($json)
         ),
         'bot'
     );
 }
-// todo test
 else if ($type = 'user_change') {
     $userData = $eventPayload['user'];
+
+    $userData['email'] = $slack->apiCall(
+        'users.profile.get',
+        'user=' . $userData['id'],
+        'read',
+        true
+    )['profile']['email'];
+
     $slack->importSlackUsersToDb(array($userData));
 }
 

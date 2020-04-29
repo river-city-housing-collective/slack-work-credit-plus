@@ -17,6 +17,12 @@ $reportData = $slack->getWorkCreditData();
 
         let classes = [];
 
+        // hide filter and sort for delete row
+        if (this['key'] === 'delete') {
+            classes.push('filter-false');
+            classes.push('sorter-false');
+        }
+
         // enable select filter for categorical columns
         if (['real_name', 'name', 'other_req'].includes(this['key'])) {
             classes.push('filter-select');
@@ -81,8 +87,10 @@ $reportData = $slack->getWorkCreditData();
 <body>
     <button class="btn btn-info portal-back"><i class="fas fa-arrow-left"></i> Back to Portal</button>
     <div id="app" v-cloak>
-        <div id="successAlert" class="alert alert-success alert-dismissible fade show" style="display: none" role="alert">
-            Your hours have been submitted. Thank you for your hard work!
+        <div id="successAlert" style="display: none">
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                Your hours have been submitted. Thank you for your hard work!
+            </div>
         </div>
         <div id="header">
             <div id="title">
@@ -215,10 +223,15 @@ $reportData = $slack->getWorkCreditData();
                 <template v-if="submissions">
                     <div class="overflow-auto">
                         <b-table-lite
+                            striped
+                            stacked="md"
                             id="submissionsTable"
                             :items="submissions['items']"
                             :fields="submissions['fields']"
                         >
+                            <template v-slot:cell(delete)="data">
+                               <button class="btn btn-danger delete-record" :data-id="data.item.id"><b-icon-trash-fill></b-icon-trash-fill></button>
+                            </template>
                         </b-table-lite>
                     </div>
                     </table>
@@ -238,6 +251,7 @@ $reportData = $slack->getWorkCreditData();
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
+                    <!--todo abstract this here and in slack-->
                     <form class="modal-form">
                         <div class="modal-body">
                             <label for="hour_type_id" class="submission-label">Type of Hours:</label>
@@ -272,18 +286,18 @@ $reportData = $slack->getWorkCreditData();
                                 <label for="contribution_date" class="submission-label">Date of Contribution:</label>
                                 <input type="date" class="form-control" id="contribution_date" name="contribution_date" required>
                             </div>
-                            <div class="form-group">
-                                <label for="description" class="submission-label">Description of Work Completed:</label>
-                                <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
-                            </div>
                             <div class="form-group" v-if="userInfo['is_boarder'] != 1">
-                                <label for="other_req_id" class="submission-label">Does this fulfill an additional monthly requirement?</label>
+                                <label for="other_req_id" class="submission-label">Does this fulfill a specific monthly requirement?</label>
                                 <select class="form-control" id="other_req_id" name="other_req_id">
-                                    <option value="" selected>Select</option>
+                                    <option value="" selected>N/A</option>
                                     <option value="1">Cooked Dinner</option>
                                     <option value="2">Attended House Meeting</option>
                                     <option value="3">Attended BOD Meeting</option>
                                 </select>
+                            </div>
+                            <div id="descriptionDiv" class="form-group">
+                                <label for="description" class="submission-label">Description of Work Completed:</label>
+                                <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
                             </div>
                             <input name="submit_source" hidden value="2">
                         </div>

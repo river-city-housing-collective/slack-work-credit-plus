@@ -77,7 +77,7 @@ $( document ).ready(function() {
             if (!initialized[modalId]) {
                 $.ajax({
                     type: "POST",
-                    url: "/ajax.php?action=" + action,
+                    url: "/ajax.php?action=" + action + '&method=' + method,
                     cache: false,
                     data: data,
                     success: function (response) {
@@ -136,13 +136,12 @@ $( document ).ready(function() {
                                 $.each(types, function (index, type) {
                                     let id = type['id'];
 
-                                    // todo submitting these
                                     let $newInput = $(`
                                         <tr class="qty-tr">
                                             <td>${type['name']}</td>
                                             <td>${type['default_qty']}</td>
-                                            <td style="display: none"><input name="${category}_type_id" value="${id}"></td>
-                                            <td class="qty-input"><input step="0.5" min="-${type['default_qty']}" name="qty_modifier" data-type="${category}" data-id="${id}" type="number" value="0" class="form-control" disabled></td>
+                                            <td style="display: none"><input name="${category}_type_id[]" value="${id}"></td>
+                                            <td class="qty-input"><input step="0.5" min="-${type['default_qty']}" name="${category}_qty_modifier[]" data-type="${category}" data-id="${id}" type="number" value="0" class="form-control" disabled></td>
                                             <td class="qty-total"><input data-type="${category}" data-id="${id}" type="number" class="form-control" value="${type['default_qty']}" disabled></td>
                                         </tr>
                                     `);

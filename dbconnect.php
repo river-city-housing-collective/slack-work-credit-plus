@@ -30,3 +30,15 @@ $conn = db_connect();
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
+
+ini_set("date.timezone", "America/Chicago");
+
+$now = new DateTime();
+$mins = $now->getOffset() / 60;
+$sgn = ($mins < 0 ? -1 : 1);
+$mins = abs($mins);
+$hrs = floor($mins / 60);
+$mins -= $hrs * 60;
+$offset = sprintf('%+d:%02d', $hrs*$sgn, $mins);
+
+$conn->query("SET time_zone='$offset';");

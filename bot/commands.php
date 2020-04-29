@@ -56,8 +56,11 @@ else if ($payload['command'] == '/hours') {
 
     $reportStr = implode("\n", $reportStr);
 
-    //todo set month year
+    // header
+    $date = date('F Y');
+    $msgJson['blocks'][0]['text']['text'] = "Here's your work credit progress for *$date*!";
 
+    // hours
     $msgJson['blocks'][2]['text']['text'] = $reportStr;
 
     echo json_encode($msgJson);

@@ -1,4 +1,5 @@
 <?php
+
 require_once('dbconnect.php');
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -22,21 +23,27 @@ function debug($value, $compact = null) {
 }
 
 function email($toAddresses, $subject, $body, $ccAddresses = null) {
+    $config = parse_ini_file(
+        $_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1' ?
+            'config.ini' :
+            '/home/isaneu/private/config.ini'
+    );
+
     $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
 
     try {
         //Server settings
-        $mail->SMTPDebug = 2;                                 // Enable verbose debug output
+//        $mail->SMTPDebug = 2;                                 // Enable verbose debug output
         $mail->isSMTP();                                      // Set mailer to use SMTP
-        $mail->Host = 'smtp.dreamhost.com';                   // Specify main and backup SMTP servers
+        $mail->Host = $config['smtp_host'];                   // Specify main and backup SMTP servers
         $mail->SMTPAuth = true;                               // Enable SMTP authentication
-        $mail->Username = 'baby.yoda@rchc.coop';              // SMTP username
-        $mail->Password = '5!0#08LY6cfG';                           // SMTP password
+        $mail->Username = $config['smtp_email'];              // SMTP username
+        $mail->Password = $config['smtp_password'];           // SMTP password
         $mail->SMTPSecure = 'tls';                            // Enable TLS encryption, `ssl` also accepted
         $mail->Port = 587;                                    // TCP port to connect to
 
         //Recipients
-        $mail->setFrom('baby.yoda@rchc.coop', 'Baby Yoda');          //This is the email your form sends From
+        $mail->setFrom($config['smtp_email'], $config['smtp_username']);          //This is the email your form sends From
 
         if (!is_array($toAddresses)) {
             $toAddresses = array($toAddresses);
@@ -46,11 +53,11 @@ function email($toAddresses, $subject, $body, $ccAddresses = null) {
             $mail->addAddress($address); // Add a recipient address
         }
 
-        if (isset($ccAddresses)) {
-            foreach ($ccAddresses as $address) {
-                $mail->addCC($address);
-            }
-        }
+//        if (isset($ccAddresses)) {
+//            foreach ($ccAddresses as $address) {
+//                $mail->addCC($address);
+//            }
+//        }
 
         //$mail->addAddress('contact@example.com');               // Name is optional
         //$mail->addReplyTo('info@example.com', 'Information');
@@ -67,7 +74,7 @@ function email($toAddresses, $subject, $body, $ccAddresses = null) {
         //$mail->AltBody = 'This is the body in plain text for non-HTML mail clients';
 
         $mail->send();
-        echo 'Message has been sent';
+//        echo 'Message has been sent';
     } catch (Exception $e) {
         echo 'Message could not be sent.';
         echo 'Mailer Error: ' . $mail->ErrorInfo;
@@ -231,10 +238,10 @@ class Slack {
             'hour_type_id' => 'i',
             'description' => 's'
         ),
-        'wc_user_reqs' => array(
+        'wc_user_req_modifiers' => array(
             'slack_user_id' => 's',
-            'required_qty' => 'i',
-            'hours_type_id' => 'i',
+            'qty_modifier' => 's',
+            'hour_type_id' => 'i',
             'other_type_id' => 'i'
         )
     );
@@ -416,7 +423,7 @@ class Slack {
         foreach ($data as $key => $value) {
             if (in_array($key, $fieldKeys)) {
                 $fields[] = $key;
-                $values[] = $value;
+                $values[] = $value == '' ? null : $value;
                 $params .= $dbFields[$key];
             }
         }
@@ -523,6 +530,7 @@ class Slack {
         }
     }
 
+    // todo optimize
     public function importSlackUsersToDb($users = null) {
         if (!isset($users)) {
             $users = $this->apiCall('users.list')['members'];
@@ -545,7 +553,7 @@ class Slack {
                     $user['id'] . "', '" .
                     $user['profile']['real_name'] . "', '" .
                     $user['profile']['display_name'] . "', '" .
-                    $user['profile']['email'] . "', '" .
+                    $user['email'] . "', '" .
                     $user['profile']['phone'] . "', " .
                     ($user['is_admin'] ? 'true' : 'false') . ", " .
                     ($user['deleted'] ? 'true' : 'false') . ")";
@@ -570,7 +578,7 @@ class Slack {
     }
 
     // todo more testing with new email function
-    public function sendEmail($fromUserId, $subject, $body, $house_id = null, $reallySend = false) {
+    public function sendEmail($fromUserId, $subject, $body, $house_id, $reallySend = false) {
         $sql = "
             select
                 slack_user_id,
@@ -582,6 +590,7 @@ class Slack {
 
         $users = $this->sqlSelect($sql);
 
+        $fromEmail = '';
         $userEmails = array();
         $adminEmails = array();
 
@@ -593,7 +602,8 @@ class Slack {
             if ($user['is_admin'] == 1) {
                 $adminEmails[] = $user['email'];
             }
-            if (isset($house_id)) {
+
+            if ($house_id != 'all') {
                 if ($user['house_id'] == $house_id) {
                     $userEmails[] = $user['email'];
                 }
@@ -611,9 +621,13 @@ class Slack {
 
         // if house specific, get user readable name
         if ($house_id) {
-            $house = $this->sqlSelect("select name from sl_houses where id = $house_id");
-            $house = 'all residents and boarders of ' . $house;
+            $house = $this->sqlSelect("select name from sl_houses where slack_group_id = '$house_id'");
         }
+        else {
+            $house = 'RCHC';
+        }
+
+        $house = 'all residents and boarders of ' . $house;
 
         $body .= "\r\n\r\n" . '[This message was sent on behalf of ' . $fromEmail . ' to ' . $house . ']';
 
@@ -635,7 +649,7 @@ class Slack {
             $body .= "\r\n\r\n" . '---' . "\r\n" . "This email was intended for the following email addresses: " . "\r\n" . $emailDump;
         }
 
-        email('izneuhaus@gmail.com', $subject, $body, isset($cc) ? $cc : null);
+        email($toEmails, $subject, $body, isset($cc) ? $cc : null);
     }
 
     public function buildProfileModal($profileData) {
@@ -674,9 +688,8 @@ class Slack {
         return $viewJson;
     }
 
-    public function buildWorkCreditModal($profileData) {
-        $user_id = 'UPC9446BB';
-        $view = 'work-credit-warning';
+    public function buildWorkCreditModal($profileData, $hideDesc = false) {
+        $user_id = $profileData['slack_user_id'];
 
         $workCreditCheck = $this->sqlSelect("
                 select * from wc_time_debits
@@ -684,15 +697,26 @@ class Slack {
                 order by date_effective desc limit 1
             ");
 
-        if ($workCreditCheck) {
-            $view = 'submit-time-modal';
+        // user hasn't set up profile yet
+        if (!$workCreditCheck) {
+            return json_decode(file_get_contents('views/work-credit-warning.json'), TRUE);
         }
 
-        $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
+        $viewJson = json_decode(file_get_contents('views/submit-time-modal.json'), TRUE);
+        $optionTemp = json_decode(file_get_contents('views/other-req-option.json'), true);
 
-        if ($view == 'submit-time-modal' && !$profileData['is_boarder']) {
-            $otherReqsQuestion = json_decode(file_get_contents('views/time-resident-addon.json'), TRUE);
-            array_push($viewJson['blocks'], $otherReqsQuestion);
+        $optionsLookup = $this->sqlSelect("select * from wc_lookup_other_req_types");
+
+        foreach ($optionsLookup as $option) {
+            $optionTemp['text']['text'] = $option['slack_emoji'] . ' ' . $option['name'];
+            $optionTemp['value'] = $option['id'];
+            $viewJson['blocks'][3]['accessory']['options'][] = $optionTemp;
+        }
+
+        if ($hideDesc) {
+            $index = sizeof($viewJson['blocks']) - 1;
+
+            unset($viewJson['blocks'][$index]);
         }
 
         return $viewJson;
@@ -872,13 +896,15 @@ class Slack {
         // get time records
         $submissionData = $this->sqlSelect("
             select
-                tc.timestamp,
+                tc.id,
+                date_format(tc.timestamp, '%c/%e/%Y %l:%i:%s %p') as timestamp,
                 u.real_name,
                 tc.hours_credited,
                 lht.name,
                 tc.contribution_date,
-                tc.description,
-                lort.name as 'other_req'
+                case when tc.description is null
+                    then lort.name
+                    else tc.description end as description
             from wc_time_credits as tc
             left join sl_users as u on u.slack_user_id = tc.slack_user_id
             left join wc_lookup_hour_types as lht on lht.id = tc.hour_type_id
@@ -886,14 +912,12 @@ class Slack {
             order by tc.id desc
         ", null, true);
 
-        //todo cst timezone
-        //todo 12 hour format
-
         if ($submissionData) {
             $fields = array(
                 array(
                     'key' => 'timestamp',
-                    'label' => 'Timestamp'
+                    'label' => 'Timestamp',
+                    'tdClass' => 'timestamp-col'
                 ),
                 array(
                     'key' => 'real_name',
@@ -901,7 +925,9 @@ class Slack {
                 ),
                 array(
                     'key' => 'hours_credited',
-                    'label' => 'Hours'
+                    'label' => 'Hours',
+                    'thClass' => 'hours-col',
+                    'tdClass' => 'hours-col'
                 ),
                 array(
                     'key' => 'name', // todo db fields could use some refactoring
@@ -913,13 +939,14 @@ class Slack {
                 ),
                 array(
                     'key' => 'description',
-                    'label' => 'Description of Work Completed'
-                ),
-                array(
-                    'key' => 'other_req',
-                    'label' => 'Requirement Met'
+                    'label' => 'Description of Work Completed',
+                    'tdClass' => 'description-col'
                 )
             );
+
+            if ($this->admin) {
+                $fields = array_merge(array(array('key' => 'delete', 'label' => '', 'thClass' => 'delete-col', 'tdClass' => 'delete-col')), $fields);
+            }
 
             $reportData['submissions'] = array(
                 'fields' => $fields,
@@ -1225,7 +1252,7 @@ class Slack {
 
         if ($typeId == 3) {
             $interval = '+1 year';
-            $dateFormat = 'Y-01-01';
+            $dateFormat = 'Y-m-01';
         }
         $date = strtotime($interval, strtotime(date("Y-m-d")));
         $date = date($dateFormat, $date);

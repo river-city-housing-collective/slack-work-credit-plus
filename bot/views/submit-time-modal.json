@@ -116,6 +116,24 @@
 			}
 		},
 		{
+			"type": "section",
+			"block_id": "other_req_id",
+			"text": {
+				"type": "mrkdwn",
+				"text": "*Does this fulfill a specific monthly requirement?*"
+			},
+			"accessory": {
+				"type": "static_select",
+				"action_id": "value",
+				"placeholder": {
+					"type": "plain_text",
+					"text": "Select",
+					"emoji": true
+				},
+				"options": []
+			}
+		},
+		{
 			"type": "input",
 			"block_id": "description",
 			"element": {
