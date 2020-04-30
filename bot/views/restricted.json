@@ -2,7 +2,7 @@
 	"type": "modal",
 	"title": {
 		"type": "plain_text",
-		"text": "Under Construction",
+		"text": "Restricted",
 		"emoji": true
 	},
 	"close": {
@@ -15,7 +15,7 @@
 			"type": "section",
 			"text": {
 				"type": "mrkdwn",
-				"text": ":construction: Nothing to see here (yet)! :construction:"
+				"text": "Sorry! Resident Services is for current residents and boarders of RCHC only."
 			}
 		}
 	]
