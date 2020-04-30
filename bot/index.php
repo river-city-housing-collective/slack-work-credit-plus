@@ -81,9 +81,8 @@ else if ($type == 'block_actions') {
     if ($callback_id == 'app-home') {
         $view = $eventPayload['actions'][0]['value'];
 
-        // todo restricting WIP stuff to admins for now (also hide stuff for guests)
-        if (!$profileData['is_admin'] && in_array($view, array('send-email-modal'))) {
-            $view = 'under-construction';
+        if ($profileData['is_guest']) {
+            $view = 'restricted';
         }
 
         if ($view == 'edit-profile-modal') {
@@ -241,7 +240,7 @@ else if ($type == 'view_submission') {
     $inputValues = $slack->getInputValues($eventPayload['view']['state']['values']);
 
     if ($callback_id == 'send-email-modal') {
-        $slack->emailCommunity($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id'], true);
+        $slack->emailCommunity($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id'], false); //todo debug toggle
     }
     else if ($callback_id == 'submit-time-modal') {
         $decimalCheck = $inputValues['hours_credited'] != 0.25 ? fmod($inputValues['hours_credited'], 0.25) != 0 : false;
@@ -333,6 +332,4 @@ else if ($type == 'view_submission') {
             $slack->addToUsergroup($user_id, $inputValues['committee_id']);
         }
     }
-
-    header("HTTP/1.1 204 NO CONTENT");
 }

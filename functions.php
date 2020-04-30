@@ -406,7 +406,7 @@ class Slack {
         return $stmt->affected_rows;
     }
 
-    public function email($toAddresses, $subject, $body, $ccAddresses = null) {
+    public function email($toAddresses, $subject, $body, $ccAddresses = null, $user_id = null) {
         $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
         $config = parse_ini_file(
             $_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1' ?
@@ -416,7 +416,7 @@ class Slack {
 
         try {
             //Server settings
-//        $mail->SMTPDebug = 2;                                 // Enable verbose debug output
+            $mail->SMTPDebug = 0;                                 // Enable verbose debug output
             $mail->isSMTP();                                      // Set mailer to use SMTP
             $mail->Host = $config['smtp_host'];                   // Specify main and backup SMTP servers
             $mail->SMTPAuth = true;                               // Enable SMTP authentication
@@ -461,7 +461,7 @@ class Slack {
 
         } catch (Exception $e) {
             $this->sqlInsert('event_logs', array(
-                'slack_user_id' => isset($this->userId) ? $this->userId : null,
+                'slack_user_id' => isset($user_id) ? $user_id : null,
                 'event_type' => 'emailError',
                 'details' => 'Message could not be sent. Mailer Error: ' . $mail->ErrorInfo
             ));
@@ -581,7 +581,7 @@ class Slack {
     }
 
     // todo more testing with new email function
-    public function emailCommunity($fromUserId, $subject, $body, $house_id, $reallySend = false) {
+    public function emailCommunity($fromUserId, $subject, $body, $house_id, $debug = false) {
         $sql = "
             select
                 slack_user_id,
@@ -631,8 +631,15 @@ class Slack {
 
         $body .= "\r\n\r\n" . '[This message was sent on behalf of ' . $fromEmail . ' to ' . $recipientsStr . ']';
 
-        // check if this is a legit send or if we're just testing
-        if ($reallySend) {
+        // if debug mode enabled, only send to admins
+        if ($debug) {
+            $toEmails = $adminEmails;
+            $emailDump = implode("\r\n", $userEmails);
+
+            $subject = '[RCHC EMAIL TEST] ' . $subject;
+            $body .= "\r\n\r\n" . '---' . "\r\n" . "This email was intended for the following email addresses: " . "\r\n" . $emailDump;
+        }
+        else {
             // send to all relevant community members
             $toEmails = $userEmails;
 
@@ -641,15 +648,8 @@ class Slack {
 
             $subject = '[RCHC] ' . $subject;
         }
-        else {
-            $toEmails = 'izneuhaus@gmail.com';
-            $emailDump = implode("\r\n", $userEmails);
 
-            $subject = '[RCHC EMAIL TEST] ' . $subject;
-            $body .= "\r\n\r\n" . '---' . "\r\n" . "This email was intended for the following email addresses: " . "\r\n" . $emailDump;
-        }
-
-        $this->email($toEmails, $subject, $body, isset($cc) ? $cc : null);
+        $this->email($toEmails, $subject, $body, isset($cc) ? $cc : null, $fromUserId);
     }
 
     public function buildProfileModal($profileData) {
@@ -832,6 +832,9 @@ class Slack {
 
                 if ($hoursDiff != 0) {
                     $data[$creditField][$hourTypeId] = $data[$oldNextDebitField] + $hoursDiff;
+                }
+                else {
+                    $data[$creditField][$hourTypeId] = floatval($data[$oldDebitField]);
                 }
 
                 // strip empty decimal places
