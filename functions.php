@@ -140,6 +140,9 @@ class Slack {
             }
         }
         else {
+            $reportEmailIds = $config['REPORT_EMAILS'];
+            $config['REPORT_EMAILS'] = $this->sqlSelect("select email from sl_users where slack_user_id in ($reportEmailIds)");
+
             $this->config = $config;
 
             $identityCheck = $this->apiCall('users.identity', array(), 'user');
@@ -1028,6 +1031,7 @@ class Slack {
             left join sl_users as u on u.slack_user_id = tc.slack_user_id
             left join wc_lookup_hour_types as lht on lht.id = tc.hour_type_id
             left join wc_lookup_other_req_types as lort on lort.id = tc.other_req_id
+            where u.deleted <> 1 and u.is_guest <> 1
         ";
 
         if (isset($user_id)) {

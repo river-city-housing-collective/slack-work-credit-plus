@@ -218,7 +218,7 @@ else if ($type == 'block_actions') {
         }
     }
     // work credit /hours
-    else if ($actionValue == 'submit_time' || 'submit_time_admin') {
+    else if ($actionValue == 'submit_time' || $actionValue == 'submit_time_admin') {
         $lookup_user_id = $profileData['slack_user_id'];
         $requesting_user_id = null;
 

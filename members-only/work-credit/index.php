@@ -194,6 +194,12 @@ $reportData = $slack->getWorkCreditData();
                         </select>
                     </form>
                 </div>
+<!--                <div class="form-check" style="padding-bottom: 10px">-->
+<!--                    <input class="form-check-input" type="checkbox" id="showAll">-->
+<!--                    <label class="form-check-label" for="showAll">-->
+<!--                        Show all records (including past member submissions)-->
+<!--                    </label>-->
+<!--                </div>-->
                 <template v-if="submissions">
                     <div class="overflow-auto">
                         <b-table-lite

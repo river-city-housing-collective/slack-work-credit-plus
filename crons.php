@@ -44,7 +44,7 @@ switch($argv[1]) {
 //        }
 
         $logMsg = 'Successfully created hour debits for ' . sizeof($users) . ' members.';
-        $slack->email($slack->config['CRON_EMAIL'], 'Work Credit Hours Debit', $logMsg);
+//        $slack->email($slack->config['CRON_EMAIL'], 'Work Credit Hours Debit', $logMsg);
 
         break;
     case 'checkLeaseTerminations':
@@ -101,7 +101,7 @@ switch($argv[1]) {
                  'contents' => $pdf
              );
 
-            $slack->email($slack->config['CRON_EMAIL'], $subject, $body, null, null, $file);
+            $slack->email($slack->config['REPORT_EMAILS'], $subject, $body, null, null, $file);
          }
 
         break;
