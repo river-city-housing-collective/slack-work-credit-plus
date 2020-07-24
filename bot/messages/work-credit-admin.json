@@ -31,7 +31,7 @@
             "text": "Submit Hours (for this user)"
           },
           "style": "primary",
-          "value": "submit_time"
+          "value": "submit_time_admin"
         },
         {
           "type": "button",

@@ -90,7 +90,14 @@ else if ($command == '/hours') {
     if ($params[0] !== '') {
         // only admins can lookup other ppl's hours
         if ($is_admin) {
-            $lookup_user_id = ltrim(explode('|', $params[0])[0], '<@');
+
+            // no real accounts on dev - just pass it an id for testing
+            if ($slack->config['DEBUG_MODE'] == 1) {
+                $lookup_user_id = $slack->sqlSelect("select slack_user_id from sl_users where display_name = 'izzy'");
+            }
+            else {
+                $lookup_user_id = ltrim(explode('|', $params[0])[0], '<@');
+            }
 
             $slack->conn->query("
                 insert into sl_view_states (slack_user_id, sl_key, sl_value)

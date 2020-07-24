@@ -218,12 +218,12 @@ else if ($type == 'block_actions') {
         }
     }
     // work credit /hours
-    else if ($actionValue == 'submit_time') {
+    else if ($actionValue == 'submit_time' || 'submit_time_admin') {
         $lookup_user_id = $profileData['slack_user_id'];
         $requesting_user_id = null;
 
-        if (isset($eventPayload['actions'][0]['action_id'])) {
-            $lookup_user_id = $eventPayload['actions'][0]['action_id'];
+        if ($actionValue == 'submit_time_admin') {
+            $lookup_user_id = $slack->sqlSelect("select sl_value from sl_view_states where slack_user_id = '$user_id' and sl_key = 'work-credit-admin' order by timestamp desc limit 1");
             $requesting_user_id = $profileData['slack_user_id'];
         }
 
@@ -243,7 +243,7 @@ else if ($type == 'block_actions') {
 
 //        echo json_encode($viewJson);
 
-        $lookup_user_id = $slack->sqlSelect("select sl_value from sl_view_states where slack_user_id = '$user_id' and sl_key = 'work-credit-admin' order by timestamp limit 1");
+        $lookup_user_id = $slack->sqlSelect("select sl_value from sl_view_states where slack_user_id = '$user_id' and sl_key = 'work-credit-admin' order by timestamp desc limit 1");
         $user_lookup = $slack->sqlSelect("select real_name, lease_termination_date, wc_pause_expiration_date from sl_users where slack_user_id = '$lookup_user_id' limit 1");
 
         $viewJson['private_metadata'] = $lookup_user_id;
