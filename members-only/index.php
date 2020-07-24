@@ -7,18 +7,25 @@ require_once($_SERVER['DOCUMENT_ROOT'] . '/functions.php');
 $slack = signInWithSlack($conn);
 
 ?>
-<script>let slack = <?= json_encode($slack) ?></script>
 
 <div class="jumbotron">
     <h1 class="display-4">Welcome, <span class="user-display-name"></span>!</h1>
     <p class="lead">This is the RCHC Member Portal.</p>
     <hr class="my-4">
-    <p class="lead">
-        <a class="btn btn-primary btn-lg" href="/members-only/work-credit" role="button">Work Credit Report</a>
-    </p>
-    <?php if ($slack->admin): ?>
-        <p class="lead">
-            <a class="btn btn-warning btn-lg" href="/members-only/admin.php" role="button">Admin Tools</a>
-        </p>
-    <?php endif; ?>
+    <ul class="nav nav-pills nav-justified">
+        <li class="nav-item" style="padding: 10px">
+            <a class="btn-primary nav-link" href="/members-only/work-credit" role="button">Work Credit Report</a>
+        </li>
+        <li class="nav-item" style="padding: 10px">
+            <a class="btn-primary nav-link" href="/members-only/directory.php" role="button">Member Directory</a>
+        </li>
+<!--        <li class="nav-item" style="padding: 10px">-->
+<!--            <a class="btn-primary nav-link" href="/members-only/calendar" role="button">Calendar</a>-->
+<!--        </li>-->
+        <?php if ($slack->admin): ?>
+            <li class="nav-item" style="padding: 10px">
+                <a class="btn-warning nav-link" href="/members-only/admin.php" role="button">Admin Tools</a>
+            </li>
+        <?php endif; ?>
+    </ul>
 </div>

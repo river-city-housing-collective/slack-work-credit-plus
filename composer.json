@@ -1,0 +1,6 @@
+{
+    "require": {
+        "spipu/html2pdf": "^5.2",
+        "smrtr/mysql-version-control": "~1.0"
+    }
+}

@@ -2,3 +2,6 @@ secrets.php
 .vscode
 config.ini
 assets
+vendor
+ngrok.sh
+db.ini

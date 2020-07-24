@@ -26,16 +26,29 @@ if ($type == 'app_home_opened') {
     $json = json_decode(file_get_contents('views/app-home.json'), true);
 
     // get image and bot name from config
-    $json['blocks'][0]['image_url'] = $slack->config['BOT_HOME_IMAGE']; //todo fix hotlinks
+    $json['blocks'][0]['image_url'] = $slack->config['BOT_HOME_IMAGE'];
 
-    echo $slack->apiCall(
+    echo json_encode($slack->apiCall(
         'views.publish',
         array(
             "user_id" => $user_id,
             "view" => json_encode($json)
         ),
         'bot'
-    );
+    ));
+}
+else if ($type == 'team_join') { // team_join
+    $msgJson = json_decode(file_get_contents('messages/new-user-greeting.json'), true);
+
+    echo json_encode($slack->apiCall(
+        'chat.postMessage',
+        array(
+            'channel' => $user_id,
+            'text' => ' ',
+            'blocks' => $msgJson
+        ),
+        'bot'
+    ));
 }
 else if ($type = 'user_change') {
     $userData = $eventPayload['user'];

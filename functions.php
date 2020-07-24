@@ -128,65 +128,6 @@ class Slack {
     public $authed;
     public $admin;
 
-    public $dbFields = array(
-        'event_logs' => array(
-            'slack_user_id' => 's',
-            'event_type' => 's',
-            'details' => 's',
-            'initiated_by_cron' => 'i'
-        ),
-        'sl_houses' => array(
-            'slack_group_id' => 's',
-            'name' => 's',
-            'slack_handle' => 's',
-            'slack_channel_id' => 's',
-            'door_code' => 'i',
-            'door_code_length' => 'i'
-        ),
-        'sl_users' => array(
-            'slack_user_id' => 's',
-            'real_name' => 's',
-            'display_name' => 's',
-            'email' => 's',
-            'phone' => 's',
-            'house_id' => 's',
-            'room_id' => 'i',
-            'committee_id' => 's',
-            'is_boarder' => 'i',
-            'is_guest' => 'i',
-            'is_admin' => 'i',
-            'deleted' => 'i'
-        ),
-        'sl_view_states' => array(
-            'slack_view_id' => 's',
-            'slack_user_id' => 's',
-            'sl_key' => 's',
-            'sl_value' => 's'
-        ),
-        'wc_time_credits' => array(
-            'slack_user_id' => 's',
-            'hours_credited' => 's',
-            'hour_type_id' => 'i',
-            'contribution_date' => 's',
-            'description' => 's',
-            'other_req_id' => 'i',
-            'submit_source' => 'i'
-        ),
-        'wc_time_debits' => array(
-            'date_effective' => 's',
-            'slack_user_id' => 's',
-            'hours_debited' => 's',
-            'hour_type_id' => 'i',
-            'description' => 's'
-        ),
-        'wc_user_req_modifiers' => array(
-            'slack_user_id' => 's',
-            'qty_modifier' => 's',
-            'hour_type_id' => 'i',
-            'other_type_id' => 'i'
-        )
-    );
-
     public function __construct($conn, $config = null, $userToken = null) {
         $this->conn = $conn;
 
@@ -245,6 +186,7 @@ class Slack {
                 'real_name' => $slackUserInfo['real_name'],
                 'display_name' => $slackUserInfo['display_name'],
                 'avatar' => $slackUserInfo['image_72'],
+                'house_id' => $additionalUserDetails['house_id'],
                 'house' => $additionalUserDetails['name'],
                 'type' => implode('/', $roles),
                 'is_boarder' => $this->admin ? 0 : $additionalUserDetails['is_boarder'], // override boarder restrictions if admin
@@ -343,13 +285,27 @@ class Slack {
             $returnResult = $returnResult[0];
         }
 
+//        debug($returnResult);
+
         return $returnJson ? json_encode($returnResult) : $returnResult;
     }
 
-    public function sqlInsert($table, $data) {
-        $dbFields = $this->dbFields[$table];
+    public function sqlInsert($table, $data, $returnId = false) {
+        $dbFields = array();
+        $primaryKey = '';
+
+        $fields = $this->conn->query("SHOW COLUMNS FROM $table");
+
+        while($fieldRow = $fields->fetch_assoc()) {
+            $dbFields[$fieldRow['Field']] = strpos($fieldRow['Type'], 'int') ? 'i' : 's';
+
+            if ($fieldRow['Key'] == 'PRI') {
+                $primaryKey = $fieldRow['Field'];
+            }
+        }
+
         $fieldKeys = array_keys($dbFields);
-        $primaryKey = ($table == 'sl_view_states' ? 'slack_view_id' : 'slack_user_id');
+//        $primaryKey = ($table == 'sl_view_states' ? 'slack_view_id' : 'slack_user_id');
 
         if ($table == 'event_logs') {
             unset($primaryKey);
@@ -403,13 +359,17 @@ class Slack {
         $stmt->bind_param($params, ...$values);
         $stmt->execute();
 
+        if ($returnId) {
+            return $this->sqlSelect("SELECT LAST_INSERT_ID();");
+        }
+
         return $stmt->affected_rows;
     }
 
-    public function email($toAddresses, $subject, $body, $ccAddresses = null, $user_id = null) {
+    public function email($toAddresses, $subject, $body, $ccAddresses = null, $user_id = null, $attachment = null) {
         $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
         $config = parse_ini_file(
-            $_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1' ?
+            in_array($_SERVER["REMOTE_ADDR"], ['127.0.0.1', '::1', 'localhost', null]) ?
                 'config.ini' :
                 '/home/isaneu/private/config.ini'
         );
@@ -447,8 +407,10 @@ class Slack {
             //$mail->addBCC('bcc@example.com');
 
             //Attachments
-            //$mail->addAttachment('/var/tmp/file.tar.gz');         // Add attachments
-            //$mail->addAttachment('/tmp/image.jpg', 'new.jpg');    // Optional name
+            if (isset($attachment)) {
+                $mail->AddStringAttachment($attachment['contents'], $attachment['name']);       // Add attachments
+                //$mail->addAttachment('/tmp/image.jpg', 'new.jpg');    // Optional name
+            }
 
             //Content
 //        $mail->isHTML(true);                                  // Set email format to HTML
@@ -456,16 +418,25 @@ class Slack {
             $mail->Body    = $body;
             //$mail->AltBody = 'This is the body in plain text for non-HTML mail clients';
 
-            $mail->send();
-//        echo 'Message has been sent';
-
+            if ($mail->send()) {
+                $event_type = 'emailSent';
+                $details = 'Successfully sent email. Subject: "' . $subject . '"';
+                //        echo 'Message has been sent';
+            }
+            else {
+                $event_type = 'emailError';
+                $details = 'Failed send step.';
+            }
         } catch (Exception $e) {
-            $this->sqlInsert('event_logs', array(
-                'slack_user_id' => isset($user_id) ? $user_id : null,
-                'event_type' => 'emailError',
-                'details' => 'Message could not be sent. Mailer Error: ' . $mail->ErrorInfo
-            ));
+            $event_type = 'emailError';
+            $details = 'Message could not be sent. Mailer Error: ' . $mail->ErrorInfo;
         }
+
+        $this->sqlInsert('event_logs', array(
+            'slack_user_id' => isset($user_id) ? $user_id : null,
+            'event_type' => $event_type,
+            'details' => $details
+        ));
     }
 
     public function addToUsergroup($user_id, $usergroup_id) {
@@ -556,7 +527,7 @@ class Slack {
                     $user['id'] . "', '" .
                     $user['profile']['real_name'] . "', '" .
                     $user['profile']['display_name'] . "', '" .
-                    $user['email'] . "', '" .
+                    $user['profile']['email'] . "', '" .
                     $user['profile']['phone'] . "', " .
                     ($user['is_admin'] ? 'true' : 'false') . ", " .
                     ($user['deleted'] ? 'true' : 'false') . ")";
@@ -633,7 +604,7 @@ class Slack {
 
         // if debug mode enabled, only send to admins
         if ($debug) {
-            $toEmails = $adminEmails;
+            $toEmails = $this->config['CRON_EMAIL'];
             $emailDump = implode("\r\n", $userEmails);
 
             $subject = '[RCHC EMAIL TEST] ' . $subject;
@@ -688,9 +659,7 @@ class Slack {
         return $viewJson;
     }
 
-    public function buildWorkCreditModal($profileData, $hideDesc = false) {
-        $user_id = $profileData['slack_user_id'];
-
+    public function buildWorkCreditModal($user_id, $hideDesc = false, $admin_user_id = null) {
         $workCreditCheck = $this->sqlSelect("
                 select * from wc_time_debits
                 where slack_user_id = '$user_id'
@@ -719,10 +688,26 @@ class Slack {
             unset($viewJson['blocks'][$index]);
         }
 
+        if (isset($admin_user_id)) {
+            $otherUserName = $this->sqlSelect("select real_name from sl_users where slack_user_id = '$user_id'");
+
+            $userInfoBlock = array(
+                'type' => 'section',
+                'text' => array(
+                    'type' => 'mrkdwn',
+                    'text' => ":warning: You are logging time on behalf of *$otherUserName*. Please use responsibly."
+                )
+            );
+
+            array_unshift($viewJson['blocks'], $userInfoBlock);
+
+            $viewJson['private_metadata'] = $user_id;
+        }
+
         return $viewJson;
     }
 
-    public function getWorkCreditData($user_id = null) {
+    public function getWorkCreditData($user_id = null, $dataOnly = false) {
         // build query to get hour counts
         $hourTypes = $this->sqlSelect('select * from wc_lookup_hour_types');
         $hourFields = array(
@@ -733,7 +718,7 @@ class Slack {
         foreach($hourTypes as $type) {
             $label = $type['name'];
 
-            $reportData['hourTypesLookup'][$type['id']] = $label;;
+            $reportData['hourTypesLookup'][$type['id']] = $label;
 
             $combinedFields[] = array(
                 'key' => strtolower($label) . '_hours',
@@ -867,10 +852,17 @@ class Slack {
                     $formattedHourTypes[$type['id']] = $type;
                 }
 
-                return array(
-                    'userData' => $data,
-                    'hourTypes' => $formattedHourTypes
-                );
+                if ($dataOnly) {
+                    return $data;
+                }
+                else {
+                    return array(
+                        'userData' => $data,
+                        'hourTypes' => $formattedHourTypes
+                    );
+                }
+
+
             }
             else {
                 $groupedMemberData[$house][] = $data;
@@ -896,24 +888,7 @@ class Slack {
         $reportData['currentPage'] = 1;
         $reportData['perPage'] = 3;
 
-        // get time records
-        $submissionData = $this->sqlSelect("
-            select
-                tc.id,
-                date_format(tc.timestamp, '%c/%e/%Y %l:%i:%s %p') as timestamp,
-                u.real_name,
-                tc.hours_credited,
-                lht.name,
-                tc.contribution_date,
-                case when tc.description is null
-                    then lort.name
-                    else tc.description end as description
-            from wc_time_credits as tc
-            left join sl_users as u on u.slack_user_id = tc.slack_user_id
-            left join wc_lookup_hour_types as lht on lht.id = tc.hour_type_id
-            left join wc_lookup_other_req_types as lort on lort.id = tc.other_req_id
-            order by tc.id desc
-        ", null, true);
+        $submissionData = $this->getWorkCreditSubmissions($user_id);
 
         if ($submissionData) {
             $fields = array(
@@ -964,6 +939,105 @@ class Slack {
 
         return $reportData;
     }
+
+    public function getMemberList() {
+        $memberData = $this->sqlSelect("
+            select
+                slack_user_id,
+                real_name,
+                case when is_boarder = 1 and room_id is null
+                    then 'Boarder'
+                    else room end
+                as 'room',
+                email,
+                phone,
+                case when sh.name is null
+                    then '[Other]'
+                    else sh.name end
+                as 'house'
+            from sl_users su
+            left join sl_houses sh on su.house_id = sh.slack_group_id
+            left join sl_rooms sr on su.room_id = sr.id and su.house_id = sr.house_id
+            where deleted = 0
+            order by house, real_name
+        ");
+
+        foreach($memberData as $data) {
+            $house = $data['house'];
+            unset($data['house']);
+
+//            if ($data['real_name'] == $this->userInfo['real_name']) {
+//                $reportData['userRecord'] = $data;
+//            }
+
+            $groupedMemberData[$house][] = $data;
+        }
+
+        return array(
+            'members' => $groupedMemberData,
+            'fields' => array(
+                array(
+                    'key' => 'slack_user_id',
+                    'label' => '',
+                    'thClass' => 'hours-col',
+                    'tdClass' => 'hours-col'
+                ),
+                array(
+                    'key' => 'real_name',
+                    'label' => 'Name'
+                ),
+                array(
+                    'key' => 'room',
+                    'label' => 'Room'
+                ),
+                array(
+                    'key' => 'email',
+                    'label' => 'Email'
+                ),
+                array(
+                    'key' => 'phone',
+                    'label' => 'Phone'
+                )
+            )
+        );
+    }
+
+    public function getWorkCreditSubmissions($user_id = null) {
+        $sql = "
+            select
+                " . (!isset($user_id) ? "tc.id," : "") . "
+                date_format(tc.timestamp, '%c/%e/%Y %l:%i:%s %p') as timestamp,
+                " . (!isset($user_id) ? "u.real_name," : "") . "
+                tc.hours_credited,
+                lht.name,
+                tc.contribution_date,
+                concat_ws(
+                    ' ',
+                    (case when tc.description is null
+                         then lort.name
+                    else tc.description end),
+                    (case when tc.submitted_by is not null
+                        then concat(
+                            '[Submitted by ',
+                            (select real_name from sl_users where slack_user_id = tc.submitted_by),
+                            ' on behalf of this user]'
+                        )
+                    end)
+                ) as description
+            from wc_time_credits as tc
+            left join sl_users as u on u.slack_user_id = tc.slack_user_id
+            left join wc_lookup_hour_types as lht on lht.id = tc.hour_type_id
+            left join wc_lookup_other_req_types as lort on lort.id = tc.other_req_id
+        ";
+
+        if (isset($user_id)) {
+            $sql .= " where u.slack_user_id = '$user_id'";
+        }
+
+        $sql .= " order by tc.id desc";
+
+        return $this->sqlSelect($sql, null, true);
+}
 
     public function getOptions($table, $filter = null) {
         if ($table == 'sl_houses' || $table == 'sl_committees') {
@@ -1026,7 +1100,7 @@ class Slack {
         foreach ($valuesObj as $field => $data) {
             $data = $data['value'];
             $type = $data['type'];
-    
+
             if ($type == 'datepicker') {
                 $value = $data['selected_date'];
             }
@@ -1041,11 +1115,11 @@ class Slack {
             else {
                 $value = $data['value'];
             }
-    
+
             $inputValues[$field] = $value;
         }
 
-        return $inputValues;
+        return isset($inputValues) ? $inputValues : null;
     }
 
     public function setInputValues($viewJson, $values) {
@@ -1103,22 +1177,27 @@ class Slack {
 
     public function updateUserProfile($user_id, $inputValues = null) {
         if ($inputValues) {
+            $profileData = array(
+                'user' => $user_id,
+                'profile' => array(
+                    'real_name' => $inputValues['real_name'],
+                    'display_name' => $inputValues['display_name'],
+                    'phone' => $inputValues['phone']
+                )
+            );
+
+            if (isset($this->config['PRONOUNS_FIELD_ID'])) {
+                $profileData['fields'] = array(
+                    $this->config['PRONOUNS_FIELD_ID'] => array(
+                        'value' => $inputValues['pronouns']
+                    )
+                );
+            }
+
             $result = $this->apiCall(
                 'users.profile.set',
-                array(
-                    'user' => $user_id,
-                    'profile' => array(
-                        'real_name' => $inputValues['real_name'],
-                        'display_name' => $inputValues['display_name'],
-                        'phone' => $inputValues['phone'],
-                        'fields' => array(
-                            $this->config['PRONOUNS_FIELD_ID'] => array(
-                                'value' => $inputValues['pronouns']
-                            )
-                        )
-                    ),
+                $profileData,
                 'write'
-                )
             );
 
             // if errors saving profile
@@ -1225,7 +1304,6 @@ class Slack {
         }
     }
 
-    // todo maybe check to make dates are unique
     public function scheduleHoursDebit($user_id, $typeId, $newMember = false) {
         $userInfo = $this->sqlSelect("select is_boarder, wc_only from sl_users where slack_user_id = '$user_id'");
         $hourTypes = $this->sqlSelect("select name, default_qty, default_qty_boarder from wc_lookup_hour_types where id = $typeId");

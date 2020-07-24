@@ -1,0 +1,46 @@
+{
+  "type": "modal",
+  "callback_id": "work-credit-pause",
+  "title": {
+    "type": "plain_text",
+    "text": "Pause Work Credit",
+    "emoji": true
+  },
+  "submit": {
+    "type": "plain_text",
+    "text": "Save",
+    "emoji": true
+  },
+  "close": {
+    "type": "plain_text",
+    "text": "Cancel",
+    "emoji": true
+  },
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "This will put a temporary hold on monthly/yearly work credit requirements being applied for *???* until the given date."
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "wc_pause_expiration_date",
+      "element": {
+        "type": "datepicker",
+        "action_id": "value",
+        "placeholder": {
+          "type": "plain_text",
+          "text": "Select a date",
+          "emoji": true
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Pause Work Credit Requirements Until",
+        "emoji": true
+      }
+    }
+  ]
+}

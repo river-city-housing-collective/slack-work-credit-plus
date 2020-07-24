@@ -28,7 +28,7 @@
           "text": {
             "type": "plain_text",
             "emoji": true,
-            "text": "Submit Hours"
+            "text": "Submit Hours (for this user)"
           },
           "style": "primary",
           "value": "submit_time"
@@ -38,10 +38,19 @@
           "text": {
             "type": "plain_text",
             "emoji": true,
-            "text": "View Submissions"
+            "text": "Pause Requirements"
           },
-          "url": "",
-          "value": "view_submissions"
+          "value": "work-credit-pause"
+        },
+        {
+          "type": "button",
+          "text": {
+            "type": "plain_text",
+            "emoji": true,
+            "text": "Schedule Lease Termination"
+          },
+          "style": "danger",
+          "value": "lease-termination"
         }
       ]
     }

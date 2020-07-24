@@ -122,9 +122,6 @@ $( document ).ready(function() {
         });
     });
 
-    // todo dashboard view
-    // app.loadDashboard();
-
     $('.collapse').each(function(index, collapse) {
         var id = $(collapse).get(0).id;
 

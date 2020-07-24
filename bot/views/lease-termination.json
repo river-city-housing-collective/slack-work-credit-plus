@@ -1,0 +1,53 @@
+{
+  "type": "modal",
+  "callback_id": "lease-termination",
+  "title": {
+    "type": "plain_text",
+    "text": "Lease Termination",
+    "emoji": true
+  },
+  "submit": {
+    "type": "plain_text",
+    "text": "Save",
+    "emoji": true
+  },
+  "close": {
+    "type": "plain_text",
+    "text": "Cancel",
+    "emoji": true
+  },
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "This will schedule a lease termination for *???* on the given date. When the date of their termination has arrived, you will receive a reminder to deactivate their Slack account. I will also send out an email with their final work credit results shortly after!"
+      }
+    },
+    {
+      "type": "input",
+      "block_id": "lease_termination_date",
+      "element": {
+        "type": "datepicker",
+        "action_id": "value",
+        "placeholder": {
+          "type": "plain_text",
+          "text": "Select a date",
+          "emoji": true
+        }
+      },
+      "label": {
+        "type": "plain_text",
+        "text": "Lease Termination Date",
+        "emoji": true
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "It is recommended to schedule termination dates for new residents and update them if their lease is renewed."
+      }
+    }
+  ]
+}

@@ -8,10 +8,10 @@ function db_connect() {
     if(!isset($connection)) {
              // Load configuration as an array. Use the actual location of your configuration file
         $config = parse_ini_file(
-            $_SERVER["REMOTE_ADDR"] == '127.0.0.1' || $_SERVER["REMOTE_ADDR"] == '::1' ?
+            in_array($_SERVER["REMOTE_ADDR"], ['127.0.0.1', '::1', 'localhost', null]) ?
             'config.ini' :
-            '/home/isaneu/private/config.ini'
-        ); 
+            '../private/config.ini'
+        );
         $connection = mysqli_connect($config['servername'],$config['username'],$config['password'],$config['dbname']);
     }
 
@@ -41,4 +41,5 @@ $hrs = floor($mins / 60);
 $mins -= $hrs * 60;
 $offset = sprintf('%+d:%02d', $hrs*$sgn, $mins);
 
-$conn->query("SET time_zone='$offset';");
+$stmt = $conn->prepare("SET time_zone='$offset';");
+$stmt->execute();

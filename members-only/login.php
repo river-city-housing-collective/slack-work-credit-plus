@@ -1,5 +1,5 @@
 <script>
-    let oauthUrl = "https://slack.com/oauth/authorize?scope=identity.basic,identity.email,identity.team,identity.avatar&client_id=787965675794.822220955957&state=<?= $redirect ?>";
+    let oauthUrl = "https://slack.com/oauth/authorize?scope=identity.basic,identity.email,identity.team,identity.avatar&client_id=<?= $config['CLIENT_ID'] ?>&state=<?= $redirect ?>";
 
     $(document).ready(function() {
         $('.login > button').click(function() {

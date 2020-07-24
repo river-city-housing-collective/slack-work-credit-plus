@@ -11,32 +11,12 @@ parse_str(file_get_contents("php://input"), $payload);
 
 $user_id = $payload['user_id'];
 $channel_id = $payload['channel_id'];
+$command = $payload['command'];
+$params = explode(' ', $payload['text']);
+$is_admin = $slack->sqlSelect("select is_admin from sl_users where slack_user_id = '$user_id'");
 
-if ($payload['command'] == '/code') {
-    if ($payload['text'] != '') {
-        $house = $payload['text'];
-
-        $sql = "
-            select name, door_code from sl_houses
-            where name = '$house'
-        ";
-    }
-    else {
-        $sql = "
-            select name, door_code from sl_houses
-            left join sl_users su on sl_houses.slack_group_id = su.house_id
-            where slack_user_id = '$user_id'
-        ";
-    }
-
-    $houseInfo = $slack->sqlSelect($sql);
-
-    echo 'I got you! The door code for ' . $houseInfo['name'] . ' is ' . $houseInfo['door_code'] . '.';
-}
-else if ($payload['command'] == '/hours') {
-    $msgJson = json_decode(file_get_contents('messages/work-credit-report.json'), TRUE);
-
-    $reportData = $slack->getWorkCreditData($payload['user_id']);
+function hourReport($slack, $user_id, $lookupUser = null) {
+    $reportData = $slack->getWorkCreditData($lookupUser);
     $userData = $reportData['userData'];
     $hourTypes = $reportData['hourTypes'];
 
@@ -58,10 +38,82 @@ else if ($payload['command'] == '/hours') {
 
     // header
     $date = date('F Y');
-    $msgJson['blocks'][0]['text']['text'] = "Here's your work credit progress for *$date*!";
+    $headerStr = "Here's your work credit progress for *$date*!";
+
+    // admin only
+    if (isset($lookupUser) && $lookupUser !== $user_id) {
+        $msgJson = json_decode(file_get_contents('messages/work-credit-admin.json'), TRUE);
+
+        $headerStr = "Here's the current work credit progress for *" . $userData['real_name'] . "*!";
+
+        $msgJson['private_metadata'] = $lookupUser;
+    }
+    else {
+        $msgJson = json_decode(file_get_contents('messages/work-credit-report.json'), TRUE);
+
+        $msgJson['blocks'][sizeof($msgJson['blocks']) - 1]['elements'][1]['url'] =
+            (!empty($_SERVER['HTTPS']) ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . '/members-only/work-credit#submissions';
+    }
+
+    $msgJson['blocks'][0]['text']['text'] = $headerStr;
 
     // hours
     $msgJson['blocks'][2]['text']['text'] = $reportStr;
 
-    echo json_encode($msgJson);
+    return json_encode($msgJson);
 }
+
+if ($command == '/code') {
+    if ($payload['text'] != '') {
+        $house = $payload['text'];
+
+        $sql = "
+            select name, door_code from sl_houses
+            where name = '$house'
+        ";
+    }
+    else {
+        $sql = "
+            select name, door_code from sl_houses
+            left join sl_users su on sl_houses.slack_group_id = su.house_id
+            where slack_user_id = '$user_id'
+        ";
+    }
+
+    $houseInfo = $slack->sqlSelect($sql);
+
+    echo 'I got you! The door code for ' . $houseInfo['name'] . ' is ' . $houseInfo['door_code'] . '.';
+}
+else if ($command == '/hours') {
+    $lookup_user_id = $user_id;
+
+    if ($params[0] !== '') {
+        // only admins can lookup other ppl's hours
+        if ($is_admin) {
+            $lookup_user_id = ltrim(explode('|', $params[0])[0], '<@');
+
+            $slack->conn->query("
+                insert into sl_view_states (slack_user_id, sl_key, sl_value)
+                    values ('$user_id', 'work-credit-admin', '$lookup_user_id')
+            ");
+        }
+        else {
+            exit();
+        }
+    }
+
+    echo hourReport($slack, $user_id, $lookup_user_id);
+}
+//else if ($command == '/test') {
+//    $msgJson = json_decode(file_get_contents('messages/new-user-greeting.json'), true);
+//
+//    echo json_encode($slack->apiCall(
+//        'chat.postMessage',
+//        array(
+//            'channel' => $user_id,
+//            'text' => ' ',
+//            'blocks' => $msgJson
+//        ),
+//        'bot'
+//    ));
+//}

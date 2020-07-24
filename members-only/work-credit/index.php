@@ -44,33 +44,7 @@ $reportData = $slack->getWorkCreditData();
 <head>
     <title>Work Credit Report</title>
 
-    <!-- BootstrapVue CSS -->
-    <link type="text/css" rel="stylesheet" href="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.css" />
-
-    <!-- Load polyfills to support older browsers -->
-    <script src="//polyfill.io/v3/polyfill.min.js?features=es2015%2CIntersectionObserver" crossorigin="anonymous"></script>
-
-    <!-- Load Vue followed by BootstrapVue -->
-    <script src="//unpkg.com/vue@latest/dist/vue.min.js"></script>
-    <script src="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue.min.js"></script>
-
-    <!-- Load the following for BootstrapVueIcons support -->
-    <script src="//unpkg.com/bootstrap-vue@latest/dist/bootstrap-vue-icons.min.js"></script>
-
-    <!-- loading bar for dashboard view -->
-    <link rel="stylesheet" type="text/css" href="/resources/loading-bar/loading-bar.css"/>
-    <script type="text/javascript" src="/resources/loading-bar/loading-bar.js"></script>
-
-    <!-- for emoji -->
-    <link href="https://emoji-css.afeld.me/emoji.css" rel="stylesheet">
-
-    <!-- jquery validator -->
-    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.1/dist/jquery.validate.min.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/tablesorter@2.31.3/dist/js/jquery.tablesorter.combined.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tablesorter@2.31.3/dist/css/theme.bootstrap_4.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tablesorter@2.31.3/dist/css/jquery.tablesorter.pager.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/extras/jquery.tablesorter.pager.min.js"></script>
+    <? include $_SERVER['DOCUMENT_ROOT'] . '/resources/includes.html'; ?>
 
     <script src="/members-only/work-credit/work-credit.js"></script>
 
@@ -235,9 +209,6 @@ $reportData = $slack->getWorkCreditData();
                         </b-table-lite>
                     </div>
                     </table>
-                    <div style="display: none">
-                        Sum of Hours: <span class="total"></span>
-                    </div>
                 </template>
                 <h4 v-else style="text-align: center">No submissions found.</h4>
             </div>

@@ -10,7 +10,7 @@
 				"emoji": true
 			},
 			"image_url": "",
-			"alt_text": ""
+			"alt_text": "Resident Services"
 		},
 		{
 			"type": "divider"
@@ -32,7 +32,7 @@
 				"type": "button",
 				"text": {
 					"type": "plain_text",
-					"text": "Submit Time",
+					"text": "Submit Hours",
 					"emoji": true
 				},
 				"value": "submit-time-modal"

@@ -74,8 +74,10 @@ else if ($type == 'block_actions') {
 
     $profileData = $slack->sqlSelect("select * from sl_users where slack_user_id = '$user_id'");
 
-    $profileData['pronouns'] = $slack->apiCall('users.profile.get', 'user=' . $user_id, 'read', true)
+    if (isset($slack->config['PRONOUNS_FIELD_ID'])) {
+        $profileData['pronouns'] = $slack->apiCall('users.profile.get', 'user=' . $user_id, 'read', true)
         ['profile']['fields'][$slack->config['PRONOUNS_FIELD_ID']]['value'];
+    }
 
     // opening modals on app home
     if ($callback_id == 'app-home') {
@@ -89,7 +91,7 @@ else if ($type == 'block_actions') {
             $viewJson = $slack->buildProfileModal($profileData);
         }
         else if ($view == 'submit-time-modal') {
-            $viewJson = $slack->buildWorkCreditModal($profileData);
+            $viewJson = $slack->buildWorkCreditModal($profileData['slack_user_id']);
         }
         else {
             $viewJson = json_decode(file_get_contents('views/' . $view . '.json'), TRUE);
@@ -203,7 +205,7 @@ else if ($type == 'block_actions') {
 //            $viewJson['blocks'][0]['element']['options'] = $slack->getOptions('sl_rooms', $profileData['house_id']);
 //            $viewJson = $slack->setInputValues($viewJson, $profileData);
 
-            $viewJson = $slack->buildWorkCreditModal($profileData, true);
+            $viewJson = $slack->buildWorkCreditModal($profileData['slack_user_id'], true);
 
             echo json_encode($slack->apiCall(
                 'views.update',
@@ -217,11 +219,60 @@ else if ($type == 'block_actions') {
     }
     // work credit /hours
     else if ($actionValue == 'submit_time') {
-        $viewJson = $slack->buildWorkCreditModal($profileData);
+        $lookup_user_id = $profileData['slack_user_id'];
+        $requesting_user_id = null;
+
+        if (isset($eventPayload['actions'][0]['action_id'])) {
+            $lookup_user_id = $eventPayload['actions'][0]['action_id'];
+            $requesting_user_id = $profileData['slack_user_id'];
+        }
+
+        $viewJson = $slack->buildWorkCreditModal($lookup_user_id, false, $requesting_user_id);
 
         echo json_encode($slack->apiCall(
             'views.open',
             array(
+                'view' => $viewJson,
+                'trigger_id' => $trigger_id
+            ),
+            'bot'
+        ));
+    }
+    else if ($actionValue == 'lease-termination' || $actionValue == 'work-credit-pause') {
+        $viewJson = json_decode(file_get_contents('views/' . $actionValue . '.json'), TRUE);
+
+//        echo json_encode($viewJson);
+
+        $lookup_user_id = $slack->sqlSelect("select sl_value from sl_view_states where slack_user_id = '$user_id' and sl_key = 'work-credit-admin' order by timestamp limit 1");
+        $user_lookup = $slack->sqlSelect("select real_name, lease_termination_date, wc_pause_expiration_date from sl_users where slack_user_id = '$lookup_user_id' limit 1");
+
+        $viewJson['private_metadata'] = $lookup_user_id;
+
+        $modalBody = $viewJson['blocks'][0]['text']['text'];
+        $viewJson['blocks'][0]['text']['text'] = str_replace('???', $user_lookup['real_name'], $modalBody);
+
+        $dateType = $viewJson['blocks'][1]['block_id'];
+
+        if (isset($user_lookup[$dateType])) {
+            $viewJson['blocks'][1]['element']['initial_date'] = $user_lookup[$dateType];
+        }
+
+        echo json_encode($slack->apiCall(
+            'views.open',
+            array(
+                'view' => $viewJson,
+                'trigger_id' => $trigger_id
+            ),
+            'bot'
+        ));
+    }
+    else if ($actionValue == 'edit-profile-modal') {
+        $viewJson = $slack->buildProfileModal($profileData);
+
+        echo json_encode($slack->apiCall(
+            'views.open',
+            array(
+                'text' => '',
                 'view' => $viewJson,
                 'trigger_id' => $trigger_id
             ),
@@ -240,7 +291,7 @@ else if ($type == 'view_submission') {
     $inputValues = $slack->getInputValues($eventPayload['view']['state']['values']);
 
     if ($callback_id == 'send-email-modal') {
-        $slack->emailCommunity($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id'], false); //todo debug toggle
+        $slack->emailCommunity($user_id, $inputValues['subject'], $inputValues['body'], $inputValues['house_id'], $slack->config['DEBUG_MODE']);
     }
     else if ($callback_id == 'submit-time-modal') {
         $decimalCheck = $inputValues['hours_credited'] != 0.25 ? fmod($inputValues['hours_credited'], 0.25) != 0 : false;
@@ -284,6 +335,12 @@ else if ($type == 'view_submission') {
                 $inputValues['other_req_id'] = '0';
             }
 
+            // if other user_id was passed, submit on behalf of that user instead
+            if ($eventPayload['view']['private_metadata'] != '') {
+                $inputValues['slack_user_id'] = $eventPayload['view']['private_metadata'];
+                $inputValues['submitted_by'] = $user_id;
+            }
+
             $slack->sqlInsert('wc_time_credits', $inputValues);
         }
     }
@@ -319,17 +376,24 @@ else if ($type == 'view_submission') {
         // attempt to update slack profile and db
         $slack->updateUserProfile($user_id, $inputValues);
 
-        // update usergroup associations
-        // todo testing channel associations - prob works
+        // update usergroup associations (only on paid so don't do it on dev)
+        // todo testing channel associations - prob doesn't work
+        if ($slack->config['DEBUG_MODE'] == 0) {
+            if (isset($inputValues['house_id'])) {
+                $slack->removeFromUsergroups($user_id, $inputValues['house_id'], 'sl_houses');
+                $slack->addToUsergroup($user_id, $inputValues['house_id']);
+            }
 
-        if (isset($inputValues['house_id'])) {
-            $slack->removeFromUsergroups($user_id, $inputValues['house_id'], 'sl_houses');
-            $slack->addToUsergroup($user_id, $inputValues['house_id']);
+            if (isset($inputValues['committee_id'])) {
+                $slack->removeFromUsergroups($user_id, $inputValues['committee_id'], 'sl_committees');
+                $slack->addToUsergroup($user_id, $inputValues['committee_id']);
+            }
         }
 
-        if (isset($inputValues['committee_id'])) {
-            $slack->removeFromUsergroups($user_id, $inputValues['committee_id'], 'sl_committees');
-            $slack->addToUsergroup($user_id, $inputValues['committee_id']);
-        }
+    }
+    else if ($callback_id == 'lease-termination' || $callback_id == 'work-credit-pause') {
+        $inputValues['slack_user_id'] = $eventPayload['view']['private_metadata'];
+
+        $slack->sqlInsert('sl_users', $inputValues);
     }
 }

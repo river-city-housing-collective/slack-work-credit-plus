@@ -50,7 +50,7 @@ switch($action) {
             // event details for logging
             $details = "Updated Work Credit requirements for " . $_POST['user_id'];
 
-            echo json_encode($mods);
+            echo "Successfully updated user's requirements.";
         }
         else if ($method === 'load_user') {
             $user_id = $_POST['user_id'];
@@ -78,7 +78,7 @@ switch($action) {
                 $data['ok'] = true;
             }
 
-            header('Content-Type', 'application/json');
+//            header('Content-Type', 'application/json');
             echo json_encode($data);
         }
         else {
