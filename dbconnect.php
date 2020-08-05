@@ -8,10 +8,9 @@ function db_connect() {
     if(!isset($connection)) {
              // Load configuration as an array. Use the actual location of your configuration file
         $config = parse_ini_file(
-            in_array($_SERVER["REMOTE_ADDR"], ['127.0.0.1', '::1', 'localhost', null]) ?
-            'config.ini' :
-            '../private/config.ini'
-        );
+            isset($_SERVER['HOME']) ?
+                $_SERVER['HOME'] . '/private/config.ini' :
+                $_SERVER['INI_PATH']); // todo fix
         $connection = mysqli_connect($config['servername'],$config['username'],$config['password'],$config['dbname']);
     }
 

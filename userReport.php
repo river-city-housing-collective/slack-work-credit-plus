@@ -44,19 +44,19 @@
 <div style="width: 100%;">
     <table class="info-table">
         <tr>
-            <td><strong>House:</strong> Summit</td>
-            <td><strong>Room:</strong> D1</td>
+            <td><strong>House:</strong> <?= $additionalUserInfo['house_name'] ?></td>
+            <td><strong>Room:</strong> <?= $additionalUserInfo['room_number'] ?></td>
         </tr>
         <tr>
-            <td><strong>Email:</strong> izneuhaus@gmail.com</td>
-            <td><strong>Phone:</strong> 555-555-5555</td>
+            <td><strong>Email:</strong> <?= $additionalUserInfo['email'] ?></td>
+            <td><strong>Phone:</strong> <?= $additionalUserInfo['phone'] ?></td>
         </tr>
     </table>
 </div>
 <hr style="width:50%;text-align:left;margin-left:0">
 <div style="width: 100%;">
     <table style="width: 100%; font-size: 16px; font-weight: bold">
-        <?php foreach ($hoursData as $hours): ?>
+        <?php foreach ($user['hoursData'] as $hours): ?>
         <tr style="background-color: <?= $hours['color'] ?>; border-bottom: 1px">
             <td style="padding-left:100px; width:50%;"><?= $hours['label'] . " Hours: " ?></td>
             <td style="width:50%; text-align: center"><?= $hours['diff'] ?></td>

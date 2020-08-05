@@ -7,7 +7,6 @@ require_once('vendor/autoload.php');
 $slack = new Slack($conn);
 
 use Spipu\Html2Pdf\Html2Pdf;
-$html2pdf = new Html2Pdf();
 
 $logMsg = '';
 
@@ -48,16 +47,35 @@ switch($argv[1]) {
 
         break;
     case 'checkLeaseTerminations':
-        $terminatedUsers = $slack->sqlSelect("select * from sl_users where lease_termination_date <= curdate() and deleted = 0", null, true);
+        $terminatedUsers = $slack->sqlSelect("select * from sl_users where lease_termination_date <= curdate()", null, true);
+
+        if (!$terminatedUsers) {
+            exit("no expired leases found \n");
+        }
 
         foreach($terminatedUsers as $user) {
+            ob_start();
+
+            $user['pdf'] = new Html2Pdf();
+
             $user_id = $user['slack_user_id'];
             $real_name = $user['real_name'];
+
+            $additionalUserInfo = $slack->sqlSelect("
+                select
+                    su.*,
+                    sh.name as 'house_name',
+                    sr.room as 'room_number'
+                from sl_users su
+                left join sl_houses sh on su.house_id = sh.slack_group_id
+                left join sl_rooms sr on su.room_id = sr.id and su.house_id = sr.house_id
+                where slack_user_id = '$user_id'
+            ");
 
             $data = $slack->getWorkCreditData($user_id, true);
             $hourTypes = $slack->sqlSelect('select * from wc_lookup_hour_types');
 
-            $subject = "[RCHC] Final Work Credit Report for $real_name";
+            $subject = $slack->config['EMAIL_LABEL'] . " Final Work Credit Report for $real_name";
             $body = "Hi!\n\nToday is $real_name's last day at RCHC. I've compiled this report about their work credit progress:\n\n";
 
              foreach($hourTypes as $typeInfo) {
@@ -65,7 +83,7 @@ switch($argv[1]) {
                 $hourDiff = $data['hours_credited'][$typeInfo['id']];
 
                 // store for pdf
-                $hoursData[] = array(
+                $user['hoursData'][] = array(
                     "label" => $hourLabel,
                     "diff" => $hourDiff,
                     "color" => $hourDiff >= 0 ? "#49beb7" : "#ff5959"
@@ -82,17 +100,13 @@ switch($argv[1]) {
 
             $body .= "\n\nLet me know if you need anything else!\n\nLove,\n" . $slack->config['BOT_NAME'];
 
-             $userData = $data['userData'];
-             $additionalUserInfo = $slack->sqlSelect("select * from sl_users where slack_user_id = '$user_id'");
-             $submissions = $slack->getWorkCreditSubmissions($user_id);
+            $submissions = $slack->getWorkCreditSubmissions($user_id);
 
-             ob_start();
-             include_once('userReport.php');
+             include('userReport.php');
              $output = ob_get_clean();
-             ob_flush();
 
-             $html2pdf->writeHTML($output);
-             $pdf = $html2pdf->output('report.pdf', 'S');
+            $user['pdf']->writeHTML($output);
+             $pdf = $user['pdf']->output('report.pdf', 'S');
 //
              $real_name = str_replace(' ', '_', strtolower($real_name));
 
@@ -101,8 +115,25 @@ switch($argv[1]) {
                  'contents' => $pdf
              );
 
-            $slack->email($slack->config['REPORT_EMAILS'], $subject, $body, null, null, $file);
+            $reportEmails = $slack->config['REPORT_EMAILS'];
+            $reportEmails = $slack->sqlSelect("select email from sl_users where slack_user_id in ($reportEmails)");
+
+            $completed = $slack->email($reportEmails, $subject, $body, null, null, $file);
+
+            if ($completed) {
+                $slack->sqlInsert('sl_users', array('slack_user_id' => $user_id, 'lease_termination_date' => null));
+
+                echo "successfully processed termination for ". $real_name . "\n";
+            }
+            else {
+                echo "failed to process termination for ". $real_name . "\n";
+            }
+
+            ob_flush();
+            ob_end_clean();
          }
+
+        $logMsg = 'Processed terminations for ' . sizeof($terminatedUsers) . ' users.';
 
         break;
     default:

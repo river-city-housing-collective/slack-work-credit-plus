@@ -140,9 +140,6 @@ class Slack {
             }
         }
         else {
-            $reportEmailIds = $config['REPORT_EMAILS'];
-            $config['REPORT_EMAILS'] = $this->sqlSelect("select email from sl_users where slack_user_id in ($reportEmailIds)");
-
             $this->config = $config;
 
             $identityCheck = $this->apiCall('users.identity', array(), 'user');
@@ -371,11 +368,7 @@ class Slack {
 
     public function email($toAddresses, $subject, $body, $ccAddresses = null, $user_id = null, $attachment = null) {
         $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
-        $config = parse_ini_file(
-            in_array($_SERVER["REMOTE_ADDR"], ['127.0.0.1', '::1', 'localhost', null]) ?
-                'config.ini' :
-                '/home/isaneu/private/config.ini'
-        );
+        $config = parse_ini_file($_ENV['HOME'] . '/private/config.ini'); // todo prob fix this
 
         try {
             //Server settings
@@ -421,10 +414,12 @@ class Slack {
             $mail->Body    = $body;
             //$mail->AltBody = 'This is the body in plain text for non-HTML mail clients';
 
+            $success = false;
+
             if ($mail->send()) {
                 $event_type = 'emailSent';
                 $details = 'Successfully sent email. Subject: "' . $subject . '"';
-                //        echo 'Message has been sent';
+                $success = true;
             }
             else {
                 $event_type = 'emailError';
@@ -440,6 +435,8 @@ class Slack {
             'event_type' => $event_type,
             'details' => $details
         ));
+
+        return $success;
     }
 
     public function addToUsergroup($user_id, $usergroup_id) {
@@ -775,7 +772,7 @@ class Slack {
             from sl_users u
             left join sl_houses as h on h.slack_group_id = u.house_id
             left join sl_rooms as r on r.id = u.room_id and r.house_id = u.house_id
-            where u.deleted <> 1 and u.is_guest <> 1 and u.house_id is not null
+            where " . ($dataOnly ? "" : "u.deleted <> 1 and ") . "u.is_guest <> 1 and u.house_id is not null
         ";
 
         if (isset($user_id)) {
@@ -817,13 +814,7 @@ class Slack {
 
                 // subtract total debits from earned hours
                 $hoursDiff = $data[$oldCreditField] - $data[$oldDebitField];
-
-                if ($hoursDiff != 0) {
-                    $data[$creditField][$hourTypeId] = $data[$oldNextDebitField] + $hoursDiff;
-                }
-                else {
-                    $data[$creditField][$hourTypeId] = floatval($data[$oldDebitField]);
-                }
+                $data[$creditField][$hourTypeId] = $data[$oldNextDebitField] + $hoursDiff;
 
                 // strip empty decimal places
                 $data[$nextDebitField][$hourTypeId] = floatval($data[$oldNextDebitField]);

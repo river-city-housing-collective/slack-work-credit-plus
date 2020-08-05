@@ -8,6 +8,10 @@ $slack = signInWithSlack($conn, true);
 ?>
 <script type="text/javascript" src="admin.js"></script>
 
+<script>
+    toolButtons.mysqlAdmin.url = '<?= $slack->config['PHPMYADMIN_URL'] ?>';
+</script>
+
 <button class="btn btn-info portal-back"><i class="fas fa-arrow-left"></i> Back to Portal</button>
 
 <div class="jumbotron">

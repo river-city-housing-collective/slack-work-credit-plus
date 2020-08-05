@@ -20,12 +20,28 @@ let toolButtons = {
         'label': 'Force Sync User Data',
         'description': 'Re-sync all user information from Slack to the Work Credit database (use this if someone\'s name isn\'t appearing in the Work Credit Report).',
         'modal' : false
+    },
+    'mysqlAdmin': {
+        'label': 'Open phpMyAdmin',
+        'description': 'Generate custom reports directly against the database (if you don\'t know what this is, don\'t worry about it :)',
+        'url': ''
     }
 };
 
 $( document ).ready(function() {
     $.each(toolButtons, function (action, data) {
-        $('#buttons').append(`
+        if (data.url) {
+            $('#buttons').append(`
+            <p class="lead">
+                <a class="btn btn-primary btn-lg" href="${data.url}" role="button">
+                    <span>${data['label']}</span>
+                </a>
+            </p>
+            <p>${data['description']}</p>
+        `)
+        }
+        else {
+            $('#buttons').append(`
             <p class="lead">
                 <button class="btn btn-primary btn-lg action-button" data-action="${action}" role="button">
                     <span class="submit-label">${data['label']}</span>
@@ -38,6 +54,7 @@ $( document ).ready(function() {
             </p>
             <p>${data['description']}</p>
         `)
+        }
     });
 
     $(".action-button").click(function(e) {
