@@ -1,6 +1,6 @@
 {
-    "type": "modal",
-    "callback_id": "submit-time-modal",
+	"type": "modal",
+	"callback_id": "submit-time-modal",
 	"title": {
 		"type": "plain_text",
 		"text": "Log Work Credit Hours",
@@ -22,22 +22,15 @@
 			"block_id": "hour_type_id",
 			"text": {
 				"type": "mrkdwn",
-				"text": "*Type of Hours:*"
+				"text": "*What type of hours are you submitting?*"
 			},
 			"accessory": {
-				"type": "radio_buttons",
+				"type": "static_select",
 				"action_id": "value",
-				"initial_option": {
-					"text": {
-						"type": "plain_text",
-						"text": ":house: House",
-						"emoji": true
-					},
-					"value": "1",
-					"description": {
-						"type": "plain_text",
-						"text": "e.g. cooking, cleaning"
-					}
+				"placeholder": {
+					"type": "plain_text",
+					"text": "Select",
+					"emoji": true
 				},
 				"options": [
 					{

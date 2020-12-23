@@ -19,6 +19,8 @@ $(function () {
             case 'Summit':
                 alertClass = 'alert-success';
                 break;
+            case null:
+                alertClass = 'alert-info';
         }
 
         $('#loggedInDisplay > .alert').addClass(alertClass);

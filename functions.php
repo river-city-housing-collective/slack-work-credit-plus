@@ -368,7 +368,10 @@ class Slack {
 
     public function email($toAddresses, $subject, $body, $ccAddresses = null, $user_id = null, $attachment = null) {
         $mail = new PHPMailer(true);                              // Passing `true` enables exceptions
-        $config = parse_ini_file($_ENV['HOME'] . '/private/config.ini'); // todo prob fix this
+        $config = parse_ini_file(
+            isset($_SERVER['HOME']) ?
+                $_SERVER['HOME'] . '/private/config.ini' :
+                $_SERVER['INI_PATH']); // todo fix
 
         try {
             //Server settings
@@ -531,6 +534,20 @@ class Slack {
                     $user['profile']['phone'] . "', " .
                     ($user['is_admin'] ? 'true' : 'false') . ", " .
                     ($user['deleted'] ? 'true' : 'false') . ")";
+            }
+
+            // if deactivating user, archive work credits/debits
+            if ($user['deleted']) {
+                $userId = $user['id'];
+
+                $archiveSql = "
+                    UPDATE wc_time_credits wtc, wc_time_debits wtd
+                    SET wtc.archived = 1, wtd.archived = 1
+                    WHERE wtc.slack_user_id = $userId and
+                        wtd.slack_user_id = $userId;
+                ";
+
+                $this->conn->query($archiveSql);
             }
         }
 
@@ -736,7 +753,8 @@ class Slack {
                             then $field
                             else 0 end)
                         from $table
-                        where slack_user_id = u.slack_user_id
+                        where slack_user_id = u.slack_user_id and
+                            archived = 0
                     ) as '$newField'
                 ";
 
@@ -749,7 +767,8 @@ class Slack {
                             $field
                             from $table
                             where slack_user_id = u.slack_user_id
-                            and hour_type_id = $id
+                            and hour_type_id = $id and
+                                archived = 0
                             order by date_effective desc limit 1
                         ) as '$newField'
                     ";

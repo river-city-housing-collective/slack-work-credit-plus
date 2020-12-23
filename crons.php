@@ -12,7 +12,14 @@ $logMsg = '';
 
 switch($argv[1]) {
     case 'scheduleHoursDebit':
-        $users = $slack->sqlSelect('select * from sl_users where is_guest = 0 and deleted = 0 and house_id is not null and (wc_pause_expiration_date <= curdate() or wc_pause_expiration_date is null)');
+        $users = $slack->sqlSelect('
+            select * from sl_users
+            where is_guest = 0 and
+                deleted = 0 and
+                house_id is not null
+                and (wc_pause_expiration_date <= curdate() or wc_pause_expiration_date is null)
+                and (is_boarder = 1 or (lease_termination_date >= curdate() or lease_termination_date is null))
+        ');
 
         $results = array();
 

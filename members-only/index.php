@@ -2,6 +2,14 @@
 
 require_once($_SERVER['DOCUMENT_ROOT'] . '/functions.php');
 
+// check status of Slack API
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, "https://status.slack.com/api/v2.0.0/current");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+$slackStatus = curl_exec($ch);
+curl_close($ch);
+$slackStatus = json_decode($slackStatus, true);
+
 // page is only accessible if authorized via slack
 // $slack is available for additional API calls
 $slack = signInWithSlack($conn);
@@ -29,3 +37,7 @@ $slack = signInWithSlack($conn);
         <?php endif; ?>
     </ul>
 </div>
+
+<?php if ($slackStatus['status'] == 'active'): ?>
+    <p>Slack appears to be having issues currently, which may affect your ability to use this site.</p>
+<?php endif; ?>

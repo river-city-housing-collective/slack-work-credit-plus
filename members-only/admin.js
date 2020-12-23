@@ -11,11 +11,12 @@ let toolButtons = {
         'description': 'Generate a new door code for a house and distribute it to current members.',
         'modal': 'updateDoorCodeModal'
     },
-    'adjustRequirements': {
-        'label': 'Adjust Work Credit Requirements',
-        'description': 'Make per-member adjustments to hour requirements.',
-        'modal': 'adjustRequirementsModal'
-    },
+    // disabled - use phpmyadmin instead
+    // 'adjustRequirements': {
+    //     'label': 'Adjust Work Credit Requirements',
+    //     'description': 'Make per-member adjustments to hour requirements.',
+    //     'modal': 'adjustRequirementsModal'
+    // },
     'syncSlackUsers': {
         'label': 'Force Sync User Data',
         'description': 'Re-sync all user information from Slack to the Work Credit database (use this if someone\'s name isn\'t appearing in the Work Credit Report).',
