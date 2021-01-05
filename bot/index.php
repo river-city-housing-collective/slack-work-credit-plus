@@ -313,14 +313,14 @@ else if ($type == 'view_submission') {
                 )
             ));
         }
-        else if ($inputValues['hours_credited'] <= 0) {
-            echo json_encode(array(
-                'response_action' => 'errors',
-                'errors' => array(
-                    'hours_credited' => 'Please enter a positive number'
-                )
-            ));
-        }
+//        else if ($inputValues['hours_credited'] <= 0) {
+//            echo json_encode(array(
+//                'response_action' => 'errors',
+//                'errors' => array(
+//                    'hours_credited' => 'Please enter a positive number'
+//                )
+//            ));
+//        }
         // no errors, submit
         else {
             $inputValues['slack_user_id'] = $user_id;
