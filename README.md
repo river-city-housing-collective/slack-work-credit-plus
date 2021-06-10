@@ -1,10 +1,14 @@
 # slack-work-credit-plus
 
+![Screen Shot 2021-06-09 at 6 47 57 PM](https://user-images.githubusercontent.com/36773942/121443815-d6e91480-c953-11eb-88cc-ea9bf405b158.png)
+
 PHP-based Slack app and web interface to facilitate the use of Slack accounts for managing work credit and various other operations relating to a non-profit housing cooperative.
 
 This is currently in use at RCHC and may be generalized in the future for use at other organizations.
 
 This document is extremely WIP and subject to change over time.
+
+![log_hours](https://user-images.githubusercontent.com/36773942/121444936-157fce80-c956-11eb-91c0-e3ea1784c7e1.png)
 
 ---
 
